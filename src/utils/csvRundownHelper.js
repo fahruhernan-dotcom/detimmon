@@ -21,6 +21,34 @@ export const RUNDOWN_CSV_HEADERS = [
 ];
 
 /**
+ * Sanitasi cell terhadap kerentanan CWE-1236 (CSV / Formula Injection).
+ * Excel/Calc mengeksekusi cell yang berawalan =, +, -, @, \t, atau \r.
+ * Menambahkan prefix kutip satu (') untuk menetralkan injeksi formula tanpa merusak teks saat dibuka.
+ */
+export function sanitizeCsvFormula(val) {
+  if (val === null || val === undefined) return '';
+  const str = String(val);
+  if (/^[\t\r]/.test(str) || /^[=+\-@]/.test(str.trimStart())) {
+    return `'${str}`;
+  }
+  return str;
+}
+
+/**
+ * Membaca kembali teks yang telah disanitasi dengan menghilangkan prefix kutip satu pencegah formula
+ */
+export function desanitizeCsvFormula(val) {
+  if (typeof val !== 'string') return val;
+  if (val.startsWith("'")) {
+    const remainder = val.slice(1);
+    if (/^[\t\r]/.test(remainder) || /^[=+\-@]/.test(remainder.trimStart())) {
+      return remainder;
+    }
+  }
+  return val;
+}
+
+/**
  * Membuat data template CSV contoh yang siap diedit di Excel
  */
 export function generateRundownTemplateCsv() {
@@ -142,7 +170,7 @@ export function generateRundownTemplateCsv() {
   const csvContent = [
     RUNDOWN_CSV_HEADERS.join(','),
     ...sampleRows.map(row =>
-      row.map(field => `"${String(field || '').replace(/"/g, '""')}"`).join(',')
+      row.map(field => `"${String(sanitizeCsvFormula(field)).replace(/"/g, '""')}"`).join(',')
     )
   ].join('\r\n');
 
@@ -150,7 +178,7 @@ export function generateRundownTemplateCsv() {
 }
 
 /**
- * Mengekspor jadwal aktif saat ini ke format CSV
+ * Mengekspor jadwal aktif saat ini ke format CSV dengan proteksi CWE-1236 (Formula Injection)
  */
 export function exportRundownItemsToCsv(items, dayNumber = 1) {
   if (!items || items.length === 0) return '';
@@ -179,7 +207,7 @@ export function exportRundownItemsToCsv(items, dayNumber = 1) {
   return [
     RUNDOWN_CSV_HEADERS.join(','),
     ...rows.map(row =>
-      row.map(field => `"${String(field || '').replace(/"/g, '""')}"`).join(',')
+      row.map(field => `"${String(sanitizeCsvFormula(field)).replace(/"/g, '""')}"`).join(',')
     )
   ].join('\r\n');
 }
@@ -245,7 +273,7 @@ export function parseRundownCsv(csvString) {
     const getVal = (possibleKeys, fallback = '') => {
       for (const k of possibleKeys) {
         if (headerMap[k] !== undefined && values[headerMap[k]] !== undefined) {
-          return values[headerMap[k]];
+          return desanitizeCsvFormula(values[headerMap[k]]);
         }
       }
       return fallback;

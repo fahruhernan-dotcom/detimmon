@@ -12,6 +12,29 @@ export default function AdminLoginGate({ onBackToPublic }) {
   const [passcode, setPasscode] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [lockoutUntil, setLockoutUntil] = useState(0);
+  const [lockoutSeconds, setLockoutSeconds] = useState(0);
+
+  // Timer countdown untuk lockout brute-force
+  React.useEffect(() => {
+    if (lockoutUntil > Date.now()) {
+      const remaining = Math.ceil((lockoutUntil - Date.now()) / 1000);
+      setLockoutSeconds(remaining);
+      const interval = setInterval(() => {
+        const left = Math.ceil((lockoutUntil - Date.now()) / 1000);
+        if (left <= 0) {
+          setLockoutUntil(0);
+          setLockoutSeconds(0);
+          setErrorMessage('');
+          clearInterval(interval);
+        } else {
+          setLockoutSeconds(left);
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [lockoutUntil]);
 
   const handlePasswordLogin = async (e) => {
     e.preventDefault();
@@ -63,8 +86,17 @@ export default function AdminLoginGate({ onBackToPublic }) {
   const handlePasscodeLogin = async (e) => {
     e.preventDefault();
     setErrorMessage('');
+
+    // Cek status lockout brute-force
+    if (lockoutUntil > Date.now()) {
+      setErrorMessage(`Akses dibatasi karena terlalu banyak percobaan gagal. Coba lagi dalam ${lockoutSeconds} detik.`);
+      return;
+    }
+
     const validToken = import.meta.env.VITE_ADMIN_API_TOKEN || 'dignity_secret_admin_2026';
-    if (passcode.trim() === validToken || passcode.trim() === 'admin123') {
+    if (passcode.trim() === validToken) {
+      setFailedAttempts(0);
+      setLockoutUntil(0);
       loginAsStaff({
         id: 'staff-master-owner',
         email: 'doniesdaily@gmail.com',
@@ -72,7 +104,17 @@ export default function AdminLoginGate({ onBackToPublic }) {
         profile: { full_name: 'Donie Kurniawan (Owner)' }
       });
     } else {
-      setErrorMessage('Passcode / Token Keamanan Staf tidak valid.');
+      const nextAttempts = failedAttempts + 1;
+      if (nextAttempts >= 5) {
+        const lockDuration = Date.now() + 30000; // 30 detik lockout
+        setLockoutUntil(lockDuration);
+        setLockoutSeconds(30);
+        setFailedAttempts(0);
+        setErrorMessage('Terlalu banyak percobaan gagal. Akses dikunci sementara selama 30 detik untuk keamanan.');
+      } else {
+        setFailedAttempts(nextAttempts);
+        setErrorMessage(`Passcode / Token Keamanan Staf tidak valid. Sisa percobaan: ${5 - nextAttempts}.`);
+      }
     }
   };
 
@@ -229,10 +271,11 @@ export default function AdminLoginGate({ onBackToPublic }) {
                 <input
                   type="password"
                   required
+                  disabled={lockoutUntil > Date.now()}
                   value={passcode}
                   onChange={(e) => setPasscode(e.target.value)}
-                  placeholder="Masukkan token staf (default: admin123)..."
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-mono transition-colors"
+                  placeholder={lockoutUntil > Date.now() ? `Akses terkunci (${lockoutSeconds}s)...` : "Masukkan token staf resmi..."}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 font-mono transition-colors disabled:opacity-50"
                 />
               </div>
               <p className="text-[10.5px] text-slate-500 mt-1.5 leading-relaxed">
@@ -242,10 +285,11 @@ export default function AdminLoginGate({ onBackToPublic }) {
 
             <button
               type="submit"
-              className="w-full mt-2 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] cursor-pointer"
+              disabled={lockoutUntil > Date.now()}
+              className="w-full mt-2 flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-xl shadow-lg shadow-amber-500/20 transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
             >
               <ShieldCheck className="w-4 h-4" />
-              <span>Otorisasi Akses Internal</span>
+              <span>{lockoutUntil > Date.now() ? `Terkunci (${lockoutSeconds}s)` : 'Otorisasi Akses Internal'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </form>

@@ -264,10 +264,40 @@ export const certificateService = {
 
   /**
    * Verifikasi sertifikat publik via kode verifikasi QR (tanpa perlu login)
+   * Menggunakan RPC khusus verify_certificate_public untuk mencegah data scraping tabel penuh.
    */
   async verifyByCode(verificationCode) {
     if (!verificationCode) return null;
+    const cleanCode = verificationCode.trim();
 
+    // 1. Prioritas: Verifikasi aman via RPC verify_certificate_public (anti-scraping)
+    try {
+      const { data: rpcData, error: rpcErr } = await supabase
+        .rpc('verify_certificate_public', { p_code: cleanCode });
+
+      if (!rpcErr && rpcData && rpcData.length > 0) {
+        const item = rpcData[0];
+        return {
+          id: item.id,
+          certificate_no: item.certificate_no,
+          verification_code: item.verification_code,
+          normalized_name: item.normalized_name,
+          status: item.status,
+          issued_at: item.issued_at,
+          events: {
+            id: item.event_id,
+            title: item.event_title,
+            event_type: item.event_type,
+            date_start: item.date_start,
+            venue: item.venue
+          }
+        };
+      }
+    } catch (e) {
+      console.warn('RPC verify_certificate_public notice:', e?.message);
+    }
+
+    // 2. Fallback query langsung jika migrasi RPC belum diaplikasikan
     const { data, error } = await supabase
       .from('certificates')
       .select(`
@@ -285,11 +315,11 @@ export const certificateService = {
           venue
         )
       `)
-      .eq('verification_code', verificationCode.trim())
+      .eq('verification_code', cleanCode)
       .maybeSingle();
 
     if (error) {
-      console.warn('Notice verifyByCode:', error.message);
+      console.warn('Notice verifyByCode fallback:', error.message);
       return null;
     }
     return data;
