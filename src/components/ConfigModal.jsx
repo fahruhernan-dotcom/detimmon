@@ -33,23 +33,48 @@ export default function ConfigModal({
   const [activeTab, setActiveTab] = useState('google'); // 'google', 'hotline', 'finansial', 'dotenv'
   const [copiedKey, setCopiedKey] = useState(null);
 
-  // Local Form State initialized from config or defaults
+  // Local Form State initialized from config (zero hardcode fallback)
   const [formData, setFormData] = useState({
-    spreadsheetId: config.spreadsheetId || '1rBCPX1klMKDeFKfrC8C7I_txb8Q2duD4TEfE3UmmGcI',
-    tabRegistrasi: config.tabRegistrasi || 'DB_Registrasi_Webinar',
-    clientId: config.clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
-    clientSecret: config.clientSecret || import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '',
+    spreadsheetId: config?.spreadsheetId || '',
+    tabRegistrasi: config?.tabRegistrasi || '',
+    tabPresensi: config?.tabPresensi || '',
+    clientId: config?.clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    clientSecret: config?.clientSecret || import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '',
 
-    gasWebAppUrl: config.gasWebAppUrl || 'https://script.google.com/macros/s/AKfycbx_DIGNITI_GAS_DEPLOYMENT_ID/exec',
-    adminPhone: config.adminPhone || '6289681077483',
-    adminToken: config.adminToken || 'admin123',
-    hargaIndividu: config.hargaIndividu || '100000',
-    hargaMabar: config.hargaMabar || '500000',
-    honorDiyah: config.honorDiyah || '2500000',
-    honorWilly: config.honorWilly || '3500000',
-    biayaZoom: config.biayaZoom || '250000',
-    defaultSpeaker: config.defaultSpeaker || 'diyah'
+    gasWebAppUrl: config?.gasWebAppUrl || '',
+    adminPhone: config?.adminPhone || import.meta.env.VITE_ADMIN_WHATSAPP || '',
+    adminToken: config?.adminToken || '',
+    hargaIndividu: config?.hargaIndividu || '',
+    hargaMabar: config?.hargaMabar || '',
+    honorDiyah: config?.honorDiyah || '',
+    honorWilly: config?.honorWilly || '',
+    biayaZoom: config?.biayaZoom || '',
+    defaultSpeaker: config?.defaultSpeaker || ''
   });
+
+  // Sync formData whenever config prop changes dynamically
+  useEffect(() => {
+    if (config) {
+      setFormData(prev => ({
+        ...prev,
+        spreadsheetId: config.spreadsheetId || '',
+        tabRegistrasi: config.tabRegistrasi || '',
+        tabPresensi: config.tabPresensi || '',
+        clientId: config.clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+        clientSecret: config.clientSecret || import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '',
+        gasWebAppUrl: config.gasWebAppUrl || '',
+        adminPhone: config.adminPhone || import.meta.env.VITE_ADMIN_WHATSAPP || '',
+        adminToken: config.adminToken || '',
+        hargaIndividu: config.hargaIndividu || '',
+        hargaMabar: config.hargaMabar || '',
+        honorDiyah: config.honorDiyah || '',
+        honorWilly: config.honorWilly || '',
+        biayaZoom: config.biayaZoom || '',
+        defaultSpeaker: config.defaultSpeaker || ''
+      }));
+    }
+  }, [config]);
+
 
   // Payment Accounts State (Dinamis, Unseeded, Konfigurasi Admin)
   const [accounts, setAccounts] = useState([]);

@@ -738,8 +738,9 @@ export default function DynamicEventLandingPage({ initialSlug }) {
       {/* ── 13. TOMBOL BANTUAN WHATSAPP MENGAPUNG (FLOATING CS) ──────────────── */}
       <FloatingWhatsAppButton
         eventTitle={currentEvent?.title}
-        adminPhone="6289681077483"
+        adminPhone={currentEvent?.landing_page_config?.contact_phone || import.meta.env.VITE_ADMIN_WHATSAPP || ''}
       />
+
 
     </div>
   );

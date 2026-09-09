@@ -258,20 +258,21 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
   const [config, setConfig] = useState({
     gasWebAppUrl: localStorage.getItem('digniti_react_gas_url') || '',
     googleApiKey: localStorage.getItem('digniti_react_google_api_key') || '',
-    clientId: localStorage.getItem('digniti_react_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '413035723577-2r3sm03gq11i5nap52f6prcp13c9p5ii.apps.googleusercontent.com',
-    clientSecret: localStorage.getItem('digniti_react_client_secret') || '',
-    spreadsheetId: localStorage.getItem('digniti_react_spreadsheet_id') || '1rBCPX1klMKDeFKfrC8C7I_txb8Q2duD4TEfE3UmmGcI',
-    tabRegistrasi: localStorage.getItem('digniti_sheet_tab_registrasi') || 'DB_Registrasi_Webinar',
-    tabPresensi: localStorage.getItem('digniti_sheet_tab_presensi') || 'DB_Presensi_&_Sertifikat',
-    adminPhone: localStorage.getItem('digniti_react_admin_phone') || '6289681077483',
-    adminToken: localStorage.getItem('digniti_react_admin_token') || 'admin123',
-    hargaIndividu: localStorage.getItem('digniti_react_harga_individu') || '100000',
-    hargaMabar: localStorage.getItem('digniti_react_harga_mabar') || '500000',
-    honorDiyah: localStorage.getItem('digniti_react_honor_diyah') || '2500000',
-    honorWilly: localStorage.getItem('digniti_react_honor_willy') || '3500000',
-    biayaZoom: localStorage.getItem('digniti_react_biaya_zoom') || '250000',
-    defaultSpeaker: localStorage.getItem('digniti_react_speaker') || 'diyah'
+    clientId: localStorage.getItem('digniti_react_client_id') || import.meta.env.VITE_GOOGLE_CLIENT_ID || '',
+    clientSecret: localStorage.getItem('digniti_react_client_secret') || import.meta.env.VITE_GOOGLE_CLIENT_SECRET || '',
+    spreadsheetId: localStorage.getItem('digniti_react_spreadsheet_id') || '',
+    tabRegistrasi: localStorage.getItem('digniti_sheet_tab_registrasi') || '',
+    tabPresensi: localStorage.getItem('digniti_sheet_tab_presensi') || '',
+    adminPhone: localStorage.getItem('digniti_react_admin_phone') || import.meta.env.VITE_ADMIN_WHATSAPP || '',
+    adminToken: localStorage.getItem('digniti_react_admin_token') || '',
+    hargaIndividu: localStorage.getItem('digniti_react_harga_individu') || '',
+    hargaMabar: localStorage.getItem('digniti_react_harga_mabar') || '',
+    honorDiyah: localStorage.getItem('digniti_react_honor_diyah') || '',
+    honorWilly: localStorage.getItem('digniti_react_honor_willy') || '',
+    biayaZoom: localStorage.getItem('digniti_react_biaya_zoom') || '',
+    defaultSpeaker: localStorage.getItem('digniti_react_speaker') || ''
   });
+
 
   const [googleOAuthToken, setGoogleOAuthToken] = useState(() => {
     return localStorage.getItem('digniti_google_oauth_token') || null;

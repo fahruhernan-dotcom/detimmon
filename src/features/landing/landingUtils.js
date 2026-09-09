@@ -47,9 +47,11 @@ export function formatDisplayTime(dateString) {
   }
 }
 
-export function buildWhatsAppHelpUrl(eventTitle, adminPhone = '6289681077483') {
-  const cleanPhone = adminPhone.replace(/[^0-9]/g, '');
+export function buildWhatsAppHelpUrl(eventTitle, adminPhone = '') {
+  const phone = adminPhone || import.meta.env.VITE_ADMIN_WHATSAPP || '';
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
   const title = eventTitle || 'Pelatihan Publik Speaking LPK Indonesia Dignity';
   const text = `Halo Admin LPK Indonesia Dignity, saya ingin menanyakan informasi lebih lanjut dan panduan pendaftaran untuk acara: *${title}*. Mohon bantuannya ya, terima kasih.`;
   return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(text)}`;
 }
+
