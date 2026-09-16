@@ -894,7 +894,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                   }`}
                 >
                   <Upload className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Upload Foto / Struk</span>
+                  <span>Upload Foto (Instan)</span>
                 </button>
                 <button
                   type="button"
@@ -918,9 +918,15 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                       <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
                       <span>Tautan Google Drive Bukti Transfer</span>
                     </label>
-                    <p className="text-[11px] text-slate-500">
-                      Masukkan tautan berkas gambar atau folder bukti transfer di Google Drive Anda. Pastikan akses tautan diatur ke <strong>"Anyone with the link can view"</strong>.
-                    </p>
+                    <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold text-amber-950">Penting: Buka Izin Akses Berkas</p>
+                        <p className="text-amber-800 mt-0.5">
+                          Pastikan hak akses berkas di Google Drive telah disetel ke <strong>"Siapa saja yang memiliki link dapat melihat" (Anyone with the link can view)</strong> agar admin finance dapat memverifikasi pembayaran Anda dalam &lt;15 detik.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <input
                     type="url"

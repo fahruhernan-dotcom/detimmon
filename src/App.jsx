@@ -331,6 +331,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
           rawBukti: pmt.proof_drive_file_id || '',
           statusBayar: isLunas ? 'LUNAS' : 'PENDING',
           statusEmailTicket: reg.registration_members?.[0]?.ticket_suffix ? 'TERKIRIM' : 'BELUM',
+          isDeleted: Boolean(reg.deleted_at),
+          deletedAt: reg.deleted_at || null,
           supabaseRegistrationId: reg.id,
           supabasePaymentId: pmt.id,
           registration_members: reg.registration_members || []
@@ -652,6 +654,83 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
     }
 
     showToast('Catatan internal pendaftar tersimpan', 'success');
+  };
+
+  // Actions: Soft Delete Participant (Move to Trash)
+  const handleSoftDeleteParticipant = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    const nowIso = new Date().toISOString();
+    // Optimistic UI update
+    setRegistrants(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          isDeleted: true,
+          deletedAt: nowIso
+        };
+      }
+      return item;
+    }));
+
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(prev => prev ? {
+        ...prev,
+        isDeleted: true,
+        deletedAt: nowIso
+      } : null);
+    }
+
+    showToast(`Pendaftar ${target.nama} dipindahkan ke tempat sampah.`, 'warning');
+
+    try {
+      if (target.supabaseRegistrationId || target.id) {
+        await registrationService.softDeleteRegistration(target.supabaseRegistrationId || target.id);
+      }
+      showToast(`Pendaftar ${target.nama} berhasil dihapus (soft delete) ✓`, 'success');
+    } catch (err) {
+      console.warn('Gagal soft delete di Supabase:', err);
+      showToast(`Peringatan: Gagal sinkron soft delete (${err.message})`, 'warning');
+    }
+  };
+
+  // Actions: Restore Participant from Trash
+  const handleRestoreParticipant = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    // Optimistic UI update
+    setRegistrants(prev => prev.map(item => {
+      if (item.id === id) {
+        return {
+          ...item,
+          isDeleted: false,
+          deletedAt: null
+        };
+      }
+      return item;
+    }));
+
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(prev => prev ? {
+        ...prev,
+        isDeleted: false,
+        deletedAt: null
+      } : null);
+    }
+
+    showToast(`Memulihkan pendaftar ${target.nama}...`, 'info');
+
+    try {
+      if (target.supabaseRegistrationId || target.id) {
+        await registrationService.restoreRegistration(target.supabaseRegistrationId || target.id);
+      }
+      showToast(`Pendaftar ${target.nama} berhasil dipulihkan dari tempat sampah ✓`, 'success');
+    } catch (err) {
+      console.warn('Gagal restore di Supabase:', err);
+      showToast(`Peringatan: Gagal sinkron pemulihan (${err.message})`, 'warning');
+    }
   };
 
   // Actions: Manual Toggle Status with Supabase SSOT
@@ -1402,6 +1481,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
                 onBackupToDrive={handleBackupToDrive}
                 onOpenWebSettings={() => setActiveTab('web-registration-settings')}
                 hasGoogleToken={Boolean(googleOAuthToken)}
+                onSoftDeleteParticipant={handleSoftDeleteParticipant}
+                onRestoreParticipant={handleRestoreParticipant}
               />
             )}
 
@@ -1740,6 +1821,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
             clientId: config.clientId
           })}
           onUpdateNotes={(id, note) => handleUpdateNotes(id, note)}
+          onSoftDelete={(id) => handleSoftDeleteParticipant(id)}
+          onRestore={(id) => handleRestoreParticipant(id)}
           hasGoogleToken={Boolean(googleOAuthToken)}
         />
 

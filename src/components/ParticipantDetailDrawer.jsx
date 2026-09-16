@@ -23,7 +23,9 @@ import {
   Users,
   ShieldAlert,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { formatRupiah, formatDate } from '../utils/formatters';
 
@@ -51,6 +53,8 @@ export default function ParticipantDetailDrawer({
   onViewProof,
   onUpdateNotes,
   onOpenProfile360,
+  onSoftDelete,
+  onRestore,
   hasGoogleToken
 }) {
   const [internalNote, setInternalNote] = useState('');
@@ -188,6 +192,26 @@ export default function ParticipantDetailDrawer({
         {/* Scrollable Drawer Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-6 text-slate-700">
           
+          {/* Status Tempat Sampah / Soft Deleted Banner */}
+          {participant.isDeleted && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between text-xs animate-fade-in">
+              <div className="flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+                <span>Peserta ini berada di <strong>Tempat Sampah</strong></span>
+              </div>
+              {onRestore && (
+                <button
+                  type="button"
+                  onClick={() => onRestore(participant.id)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-2xs transition-colors"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Pulihkan</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {/* ── SECTION 1: IDENTITY ─────────────────────────── */}
           <section>
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
@@ -493,7 +517,36 @@ export default function ParticipantDetailDrawer({
 
         {/* Drawer Footer */}
         <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
-          <span className="font-mono text-[11px]">ID: {participant.id}</span>
+          <div className="flex items-center gap-2">
+            {participant.isDeleted ? (
+              onRestore && (
+                <button
+                  type="button"
+                  onClick={() => onRestore(participant.id)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-bold transition-colors"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Pulihkan Peserta</span>
+                </button>
+              )
+            ) : (
+              onSoftDelete && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Pindahkan pendaftar "${participant.nama}" ke tempat sampah? Data dapat dipulihkan kapan saja.`)) {
+                      onSoftDelete(participant.id);
+                      onClose();
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-semibold transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Hapus Peserta</span>
+                </button>
+              )
+            )}
+          </div>
           <button
             onClick={onClose}
             className="px-3.5 py-1.5 rounded-lg bg-white border border-slate-200 text-slate-700 font-semibold hover:bg-slate-100 transition-colors"

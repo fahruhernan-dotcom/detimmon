@@ -19,6 +19,7 @@ export const registrationService = {
         status,
         source_system,
         source_row_id,
+        deleted_at,
         created_at,
         persons (
           id,
@@ -314,7 +315,71 @@ export const registrationService = {
   },
 
   /**
-   * Menghapus pendaftaran beserta relasi terkait di Supabase
+   * Melakukan soft delete pendaftaran (memindahkan ke tempat sampah)
+   */
+  async softDeleteRegistration(registrationId) {
+    if (!registrationId) throw new Error('registrationId wajib diisi');
+
+    // 1. Coba panggil RPC aman
+    try {
+      const { data, error } = await supabase.rpc('soft_delete_registration', {
+        p_registration_id: registrationId
+      });
+      if (!error && data?.success) return data;
+    } catch (rpcErr) {
+      console.warn('Notice RPC soft_delete_registration fallback to direct update:', rpcErr.message);
+    }
+
+    // 2. Fallback direct update jika RPC belum termigrasi
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('registrations')
+      .update({
+        deleted_at: nowIso,
+        updated_at: nowIso
+      })
+      .eq('id', registrationId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, registration_id: registrationId, deleted_at: nowIso, data };
+  },
+
+  /**
+   * Memulihkan pendaftaran yang sebelumnya di-soft delete (dari tempat sampah ke aktif)
+   */
+  async restoreRegistration(registrationId) {
+    if (!registrationId) throw new Error('registrationId wajib diisi');
+
+    // 1. Coba panggil RPC aman
+    try {
+      const { data, error } = await supabase.rpc('restore_registration', {
+        p_registration_id: registrationId
+      });
+      if (!error && data?.success) return data;
+    } catch (rpcErr) {
+      console.warn('Notice RPC restore_registration fallback to direct update:', rpcErr.message);
+    }
+
+    // 2. Fallback direct update jika RPC belum termigrasi
+    const nowIso = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('registrations')
+      .update({
+        deleted_at: null,
+        updated_at: nowIso
+      })
+      .eq('id', registrationId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, registration_id: registrationId, data };
+  },
+
+  /**
+   * Menghapus pendaftaran secara permanen beserta relasi terkait di Supabase (Hard Delete)
    */
   async deleteRegistration(registrationId) {
     if (!registrationId) throw new Error('registrationId wajib diisi');
