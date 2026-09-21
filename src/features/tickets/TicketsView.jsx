@@ -54,9 +54,9 @@ export default function TicketsView({
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  // Only consider verified / lunas participants for ticket issuance
+  // Only consider verified / lunas participants for ticket issuance (exclude soft-deleted)
   const lunasRegistrants = useMemo(() => {
-    return registrants.filter(r => r.statusBayar === 'LUNAS');
+    return registrants.filter(r => r.statusBayar === 'LUNAS' && !r.isDeleted);
   }, [registrants]);
 
   const unsentCount = lunasRegistrants.filter(r => r.statusEmailTicket !== 'TERKIRIM').length;

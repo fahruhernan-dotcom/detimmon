@@ -9,8 +9,10 @@ export default {
   	extend: {
   		fontFamily: {
   			sans: [
-  				'Outfit',
+  				'Inter',
   				'Plus Jakarta Sans',
+  				'system-ui',
+  				'-apple-system',
   				'sans-serif'
   			],
   			mono: [
@@ -18,8 +20,19 @@ export default {
   				'monospace'
   			],
   			display: [
-  				'Outfit',
+  				'Plus Jakarta Sans',
+  				'system-ui',
   				'sans-serif'
+  			],
+  			serif: [
+  				'Newsreader',
+  				'Georgia',
+  				'serif'
+  			],
+  			editorial: [
+  				'Newsreader',
+  				'Georgia',
+  				'serif'
   			]
   		},
   		colors: {

@@ -94,7 +94,8 @@ export const communicationService = {
           status
         )
       `)
-      .eq('event_id', eventId);
+      .eq('event_id', eventId)
+      .is('deleted_at', null);
 
     if (packageType !== 'ALL') {
       query = query.eq('package_type', packageType);

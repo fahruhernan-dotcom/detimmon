@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 2-Way Sync Engine — Phase 7: Google Workspace Integration
  * Sinkronisasi bidireksional antara Google Sheets dan Supabase
  * 
@@ -228,7 +228,8 @@ async function syncDbToSheets({ spreadsheetId, accessToken, eventId, colMap, tab
     `)
     .eq('event_id', eventId)
     .eq('source_system', 'GOOGLE_SHEETS')
-    .not('source_row_id', 'is', null);
+    .not('source_row_id', 'is', null)
+    .is('deleted_at', null);
 
   if (error) throw error;
   if (!regs || regs.length === 0) return stats;

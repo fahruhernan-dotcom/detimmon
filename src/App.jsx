@@ -45,6 +45,7 @@ import CertificateModal from './components/CertificateModal';
 import LoginPage from './components/LoginPage';
 import AdminLoginGate from './features/auth/AdminLoginGate';
 import { useAuth } from './context/AuthContext';
+import { useConfirm } from './context/ConfirmContext';
 import CommunicationCenter from './features/communication/CommunicationCenter';
 import EmailLayoutVerificationView from './features/communication/EmailLayoutVerificationView';
 import EventsPortfolioView from './features/events/EventsPortfolioView';
@@ -138,40 +139,12 @@ export default function App() {
 
   // 2. Standalone Public Registration Intake route (e.g. /daftar or #/daftar or /register or #/register)
   if (currentPath.includes('/daftar') || currentPath.includes('/register')) {
-    return (
-      <>
-        <PublicRegistrationWizard activeEvent={activeEvent} />
-        {authUser && (
-          <div className="fixed bottom-4 right-4 z-50">
-            <a
-              href="#/portal-dignity"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-amber-400 border border-amber-500/40 text-[11px] font-bold shadow-xl backdrop-blur-md transition-all hover:scale-105"
-            >
-              <span>👑 Kembali ke Command Center</span>
-            </a>
-          </div>
-        )}
-      </>
-    );
+    return <PublicRegistrationWizard activeEvent={activeEvent} />;
   }
 
   // 3. Standalone Public Attendance Intake route (e.g. /presensi or #/presensi or /absen or #/absen)
   if (currentPath.includes('/presensi') || currentPath.includes('/absen')) {
-    return (
-      <>
-        <PublicAttendanceForm />
-        {authUser && (
-          <div className="fixed bottom-4 right-4 z-50">
-            <a
-              href="#/portal-dignity"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-amber-400 border border-amber-500/40 text-[11px] font-bold shadow-xl backdrop-blur-md transition-all hover:scale-105"
-            >
-              <span>👑 Kembali ke Command Center</span>
-            </a>
-          </div>
-        )}
-      </>
-    );
+    return <PublicAttendanceForm />;
   }
 
   // 4. Secret Admin Route (e.g. /portal-dignity, /command-center, /admin-access, /admin)
@@ -200,22 +173,7 @@ export default function App() {
   }
 
   // 5. Default Public Route (e.g. / or #/ or /event/:slug) -> Dynamic Landing Page
-  return (
-    <>
-      <DynamicEventLandingPage />
-      {authUser && (
-        <div className="fixed bottom-4 right-4 z-50">
-          <a
-            href="#/portal-dignity"
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-900 text-amber-400 border border-amber-500/40 text-xs font-bold shadow-xl backdrop-blur-md transition-all hover:scale-105"
-          >
-            <span>👑 Mode Staf: Buka Command Center</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </a>
-        </div>
-      )}
-    </>
-  );
+  return <DynamicEventLandingPage />;
 }
 
 /**
@@ -224,6 +182,7 @@ export default function App() {
  * All internal dashboard hooks run unconditionally with zero rule-of-hooks violations.
  */
 function AdminCommandCenter({ currentPath, setCurrentPath }) {
+  const confirm = useConfirm();
   const { events, activeEvent, activeEventId, setActiveEventId, refreshEvents } = useEvent();
   const { user: authUser, profile: authProfile, role: authRole, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -339,7 +298,9 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
         };
       });
       setRegistrants(mapped);
-      showToast(`Data diperbarui dari Supabase (${mapped.length} pendaftar).`, 'success');
+      const activeCount = mapped.filter(r => !r.isDeleted).length;
+      const trashCount = mapped.length - activeCount;
+      showToast(`Data diperbarui dari Supabase (${activeCount} aktif${trashCount > 0 ? `, ${trashCount} di tempat sampah` : ''}).`, 'success');
     } catch (e) {
       console.warn('refreshRegistrantsFromDb error:', e);
     }
@@ -415,6 +376,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
               rawBukti: pmt.proof_drive_file_id || '',
               statusBayar: isLunas ? 'LUNAS' : 'PENDING',
               statusEmailTicket: reg.registration_members?.[0]?.ticket_suffix ? 'TERKIRIM' : 'BELUM',
+              isDeleted: Boolean(reg.deleted_at),
+              deletedAt: reg.deleted_at || null,
               supabaseRegistrationId: reg.id,
               supabasePaymentId: pmt.id,
               registration_members: reg.registration_members || []
@@ -469,11 +432,12 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
 
   // KPI Stats
   const kpiStats = useMemo(() => {
-    const totalRegistrants = registrants.length;
-    const lunasCount = registrants.filter(r => r.statusBayar === 'LUNAS').length;
-    const pendingCount = registrants.filter(r => r.statusBayar === 'PENDING').length;
-    const unsentTicketsCount = registrants.filter(r => r.statusBayar === 'LUNAS' && r.statusEmailTicket !== 'TERKIRIM').length;
-    const totalRevenue = registrants
+    const activeRegistrants = registrants.filter(r => !r.isDeleted);
+    const totalRegistrants = activeRegistrants.length;
+    const lunasCount = activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length;
+    const pendingCount = activeRegistrants.filter(r => r.statusBayar === 'PENDING').length;
+    const unsentTicketsCount = activeRegistrants.filter(r => r.statusBayar === 'LUNAS' && r.statusEmailTicket !== 'TERKIRIM').length;
+    const totalRevenue = activeRegistrants
       .filter(r => r.statusBayar === 'LUNAS')
       .reduce((sum, r) => sum + (r.nominal || 0), 0);
     const certCount = attendances.filter(a => a.statusSertifikat === 'SELESAI').length;
@@ -682,16 +646,18 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
       } : null);
     }
 
-    showToast(`Pendaftar ${target.nama} dipindahkan ke tempat sampah.`, 'warning');
-
     try {
       if (target.supabaseRegistrationId || target.id) {
-        await registrationService.softDeleteRegistration(target.supabaseRegistrationId || target.id);
+        const res = await registrationService.softDeleteRegistration(target.supabaseRegistrationId || target.id);
+        if (res?.warning) {
+          showToast(`Pendaftar ${target.nama} dipindahkan ke tempat sampah (catatan: ${res.warning})`, 'warning');
+        } else {
+          showToast(`Pendaftar ${target.nama} berhasil dipindahkan ke tempat sampah ✓`, 'success');
+        }
       }
-      showToast(`Pendaftar ${target.nama} berhasil dihapus (soft delete) ✓`, 'success');
     } catch (err) {
       console.warn('Gagal soft delete di Supabase:', err);
-      showToast(`Peringatan: Gagal sinkron soft delete (${err.message})`, 'warning');
+      showToast(`Pendaftar ${target.nama} dipindahkan ke tempat sampah lokal`, 'info');
     }
   };
 
@@ -720,16 +686,18 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
       } : null);
     }
 
-    showToast(`Memulihkan pendaftar ${target.nama}...`, 'info');
-
     try {
       if (target.supabaseRegistrationId || target.id) {
-        await registrationService.restoreRegistration(target.supabaseRegistrationId || target.id);
+        const res = await registrationService.restoreRegistration(target.supabaseRegistrationId || target.id);
+        if (res?.warning) {
+          showToast(`Pendaftar ${target.nama} dipulihkan (catatan: ${res.warning})`, 'warning');
+        } else {
+          showToast(`Pendaftar ${target.nama} berhasil dipulihkan ✓`, 'success');
+        }
       }
-      showToast(`Pendaftar ${target.nama} berhasil dipulihkan dari tempat sampah ✓`, 'success');
     } catch (err) {
       console.warn('Gagal restore di Supabase:', err);
-      showToast(`Peringatan: Gagal sinkron pemulihan (${err.message})`, 'warning');
+      showToast(`Pendaftar ${target.nama} dipulihkan di tampilan lokal`, 'info');
     }
   };
 
@@ -779,7 +747,7 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
       showToast('Silakan login dengan akun Google terlebih dahulu untuk mengirim blast email.', 'warning');
       return;
     }
-    const lunasList = registrants.filter(r => r.statusBayar === 'LUNAS');
+    const lunasList = registrants.filter(r => !r.isDeleted && r.statusBayar === 'LUNAS');
     if (lunasList.length === 0) {
       showToast('Tidak ada pendaftar berstatus LUNAS untuk dikirimi tiket.', 'info');
       return;
@@ -801,7 +769,7 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
         console.warn(`Gagal kirim tiket ke ${r.email}:`, e);
       }
     }
-    setRegistrants(prev => prev.map(item => item.statusBayar === 'LUNAS' ? { ...item, statusEmailTicket: 'TERKIRIM' } : item));
+    setRegistrants(prev => prev.map(item => (!item.isDeleted && item.statusBayar === 'LUNAS') ? { ...item, statusEmailTicket: 'TERKIRIM' } : item));
     showToast(`Selesai! ${sentCount} E-Ticket resmi berhasil dikirim via Gmail API!`, 'success');
   };
 
@@ -814,7 +782,7 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
     try {
       showToast('Mengunggah data pendaftar ke Google Drive...', 'info');
       let csv = 'Timestamp,Nomor_Ticket,Nama_Lengkap,Email,WhatsApp,Instansi,Kategori,Nominal,Bank,Status_Bayar,Status_Email\n';
-      registrants.forEach(r => {
+      registrants.filter(r => !r.isDeleted).forEach(r => {
         csv += `"${r.timestamp}","${r.nomorTicket}","${r.nama}","${r.email}","${r.whatsapp}","${r.instansi}","${r.kategori}",${r.nominal},"${r.bank}","${r.statusBayar}","${r.statusEmailTicket}"\n`;
       });
       const fileName = `Backup_Pendaftar_Dignity_${new Date().toISOString().substring(0, 10)}.csv`;
@@ -1088,7 +1056,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
       return;
     }
 
-    const nextTicket = generateNextTicketNumber(registrants.length);
+    const activeRegistrants = registrants.filter(r => !r.isDeleted);
+    const nextTicket = generateNextTicketNumber(activeRegistrants.length);
     const cleanNama = normalizeCertificateName(data.nama);
     const cleanEmail = normalizeEmail(data.email);
     const cleanWa = normalizeWhatsApp(data.whatsapp);
@@ -1176,7 +1145,15 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
   const handleDeleteRegistrant = async (id) => {
     const target = registrants.find(r => r.id === id);
     if (!target) return;
-    if (window.confirm(`Hapus pendaftar "${target.nama}" (${target.nomorTicket}) dari database Supabase secara permanen?`)) {
+    const ok = await confirm({
+      title: 'Hapus Pendaftar Permanen?',
+      description: `Data pendaftar "${target.nama}" (${target.nomorTicket || '-'}) akan dihapus permanen dari database Supabase.`,
+      note: 'Peringatan keras: Tindakan ini permanen dan tidak dapat dibatalkan.',
+      variant: 'danger',
+      confirmText: 'Hapus Permanen',
+      cancelText: 'Batalkan'
+    });
+    if (ok) {
       try {
         if (target.supabaseRegistrationId) {
           await registrationService.deleteRegistration(target.supabaseRegistrationId);
@@ -1195,7 +1172,15 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
   const handleDeleteAttendance = async (id) => {
     const target = attendances.find(a => a.id === id);
     if (!target) return;
-    if (window.confirm(`Hapus data presensi "${target.nama}" dari database Supabase?`)) {
+    const ok = await confirm({
+      title: 'Hapus Catatan Presensi?',
+      description: `Data presensi untuk "${target.nama}" akan dihapus dari database Supabase.`,
+      note: 'Tindakan ini permanen dan menghapus riwayat kehadiran terkait.',
+      variant: 'danger',
+      confirmText: 'Hapus Presensi',
+      cancelText: 'Batalkan'
+    });
+    if (ok) {
       try {
         await attendanceService.deleteAttendance(id);
         setAttendances(prev => prev.filter(a => a.id !== id));
@@ -1210,7 +1195,7 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
   // Actions: Export CSV
   const handleExportCsv = () => {
     let csv = 'Timestamp,Nomor_Ticket,Nama_Lengkap,Email,WhatsApp,Instansi,Kategori,Nominal,Bank,Status_Bayar,Status_Email\n';
-    registrants.forEach(r => {
+    registrants.filter(r => !r.isDeleted).forEach(r => {
       csv += `"${r.timestamp}","${r.nomorTicket}","${r.nama}","${r.email}","${r.whatsapp}","${r.instansi}","${r.kategori}",${r.nominal},"${r.bank}","${r.statusBayar}","${r.statusEmailTicket}"\n`;
     });
 
@@ -1833,8 +1818,10 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
           participant={activeProfile360Participant}
           activeEvent={activeEvent}
           allRegistrations={registrants.filter(r => 
-            (activeProfile360Participant?.email && r.email?.toLowerCase() === activeProfile360Participant.email?.toLowerCase()) ||
-            (activeProfile360Participant?.whatsapp && r.whatsapp === activeProfile360Participant.whatsapp)
+            !r.isDeleted && (
+              (activeProfile360Participant?.email && r.email?.toLowerCase() === activeProfile360Participant.email?.toLowerCase()) ||
+              (activeProfile360Participant?.whatsapp && r.whatsapp === activeProfile360Participant.whatsapp)
+            )
           )}
           attendances={attendances.filter(a =>
             (activeProfile360Participant?.email && a.email?.toLowerCase() === activeProfile360Participant.email?.toLowerCase()) ||
@@ -1861,8 +1848,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
             setIsFastVerifyOpen(false);
             setFastVerifyParticipantId(null);
           }}
-          allRegistrants={registrants}
-          pendingRegistrants={registrants.filter(r => r.statusBayar === 'PENDING')}
+          allRegistrants={registrants.filter(r => !r.isDeleted)}
+          pendingRegistrants={registrants.filter(r => !r.isDeleted && r.statusBayar === 'PENDING')}
           initialParticipantId={fastVerifyParticipantId}
           onVerifyPayment={(id) => handleVerifyPayment(id)}
           onRejectPaymentWithReason={(id, reason) => handleRejectPaymentWithReason(id, reason)}

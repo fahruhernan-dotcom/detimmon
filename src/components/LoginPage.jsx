@@ -38,11 +38,13 @@ export default function LoginPage({ config, onLoginSuccess }) {
   // 2. Admin Security Token Fallback
   const handlePasscodeLogin = (e) => {
     e.preventDefault();
-    setErrorMsg('');
+    const validToken = import.meta.env.VITE_ADMIN_API_TOKEN;
+    if (!validToken) {
+      setErrorMsg('Security Token belum disetel di file .env (VITE_ADMIN_API_TOKEN).');
+      return;
+    }
 
-    const validToken = import.meta.env.VITE_ADMIN_API_TOKEN || 'dignity_secret_admin_2026';
-
-    if (passcode === validToken || passcode === 'admin123') {
+    if (passcode.trim() === validToken.trim()) {
       onLoginSuccess({
         type: 'admin_token',
         token: null,

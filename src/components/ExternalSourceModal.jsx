@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ExternalSourceModal — Konfigurasi binding Google Sheets per event
  * Phase 7: Google Workspace Integration
  * LPK Indonesia Dignity in Collaboration with KLTC®
@@ -6,6 +6,7 @@
 import React, { useState, useEffect } from "react";
 import { externalSourceService } from "../services/externalSourceService";
 import { fetchFromGoogleOAuth } from "../services/sheetsService";
+import { useConfirm } from "../context/ConfirmContext";
 
 const DIRECTION_OPTS = [
   { value: "BIDIRECTIONAL", label: "⇄ Dua Arah (Direkomendasikan)" },
@@ -14,6 +15,7 @@ const DIRECTION_OPTS = [
 ];
 
 export default function ExternalSourceModal({ eventId, onClose, onSaved, googleAccessToken }) {
+  const confirm = useConfirm();
   const [sources,  setSources]  = useState([]);
   const [form,     setForm]     = useState(null);   // null = list mode, object = edit mode
   const [loading,  setLoading]  = useState(false);
@@ -105,7 +107,15 @@ export default function ExternalSourceModal({ eventId, onClose, onSaved, googleA
   }
 
   async function handleDelete(id) {
-    if (!window.confirm("Hapus binding ini? Riwayat sync akan ikut terhapus.")) return;
+    const ok = await confirm({
+      title: 'Hapus Binding Google Sheets?',
+      description: 'Apakah Anda yakin ingin menghapus konfigurasi binding ini? Riwayat sinkronisasi terkait akan ikut terhapus.',
+      note: 'Tindakan ini tidak dapat dibatalkan.',
+      variant: 'danger',
+      confirmText: 'Hapus Binding',
+      cancelText: 'Batalkan'
+    });
+    if (!ok) return;
     try {
       await externalSourceService.remove(id);
       await loadSources();

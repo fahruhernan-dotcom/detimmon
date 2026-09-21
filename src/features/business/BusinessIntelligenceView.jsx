@@ -54,11 +54,11 @@ export default function BusinessIntelligenceView({
 
   // ── 1. Financial Inflow Calculation ────────────────────────
   const verifiedList = useMemo(() => {
-    return registrants.filter(r => r.statusBayar === 'LUNAS');
+    return registrants.filter(r => !r.isDeleted && r.statusBayar === 'LUNAS');
   }, [registrants]);
 
   const pendingList = useMemo(() => {
-    return registrants.filter(r => r.statusBayar === 'PENDING');
+    return registrants.filter(r => !r.isDeleted && r.statusBayar === 'PENDING');
   }, [registrants]);
 
   const verifiedRevenue = verifiedList.reduce((acc, r) => acc + (r.nominal || 0), 0);
@@ -102,7 +102,8 @@ export default function BusinessIntelligenceView({
   const netUpsellPaxPrice = Math.max(0, (upsell.targetPrice || 0) - (upsell.rebateAmount || 0));
 
   // ── 4. Operational Funnel Ratios ───────────────────────────
-  const totalRegistrants = registrants.length;
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+  const totalRegistrants = activeRegistrants.length;
   const paidRatio = totalRegistrants > 0 ? Math.round((verifiedList.length / totalRegistrants) * 100) : 0;
   
   const totalAttended = attendances.length;

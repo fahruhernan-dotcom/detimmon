@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useCallback } from 'react';
 import { voucherService } from '../../services/registrationService';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const formatRupiah = (n) => 'Rp ' + (Number(n) || 0).toLocaleString('id-ID');
 
@@ -24,6 +25,7 @@ const DEFAULT_FORM = {
 };
 
 export default function VoucherManagementView({ events = [] }) {
+  const confirm = useConfirm();
   const [vouchers, setVouchers]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showForm, setShowForm]   = useState(false);
@@ -94,7 +96,15 @@ export default function VoucherManagementView({ events = [] }) {
 
   const handleDelete = async (v) => {
     if (v.used_count > 0) return setError(`Voucher "${v.code}" tidak bisa dihapus karena sudah pernah diklaim (${v.used_count}x). Nonaktifkan saja.`);
-    if (!window.confirm(`Hapus permanen voucher "${v.code}"?`)) return;
+    const ok = await confirm({
+      title: 'Hapus Voucher Permanen?',
+      description: `Voucher dengan kode "${v.code}" akan dihapus permanen dari sistem database.`,
+      note: 'Peringatan keras: Tindakan ini permanen dan tidak dapat dibatalkan.',
+      variant: 'danger',
+      confirmText: 'Hapus Voucher',
+      cancelText: 'Batalkan'
+    });
+    if (!ok) return;
     try {
       await voucherService.deleteVoucher(v.id);
       setSuccess(`Voucher "${v.code}" dihapus.`);

@@ -17,6 +17,7 @@ import {
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import { useEvent } from '../../context/EventContext';
 import { createEventDriveWorkspace, requestGoogleAccessToken } from '../../services/googleApiService';
+import { getLandingDefaults } from '../landing/landingContentDefaults';
 
 export default function CreateEventModal({ isOpen, onClose }) {
   const { events, refreshEvents, setActiveEventId, createEvent } = useEvent();
@@ -46,9 +47,11 @@ export default function CreateEventModal({ isOpen, onClose }) {
   const [statusMessage, setStatusMessage] = useState('');
   const [landingHeadline, setLandingHeadline] = useState('');
   const [landingSubheadline, setLandingSubheadline] = useState('');
-  const [speakerName, setSpeakerName] = useState("Halimatus Sa'diyah, S.I.Kom., M.I.Kom.");
-  const [speakerTitle, setSpeakerTitle] = useState('Certified Public Speaking Master Trainer & Founder Adikara');
-  const [speakerBio, setSpeakerBio] = useState('Praktisi dan konsultan komunikasi publik tersertifikasi yang berpengalaman melatih ribuan profesional, eksekutif BUMN, dan akademisi.');
+  const [speakerConfirmed, setSpeakerConfirmed] = useState(false);
+  const [speakerStatusBadge, setSpeakerStatusBadge] = useState('');
+  const [speakerName, setSpeakerName] = useState('');
+  const [speakerTitle, setSpeakerTitle] = useState('Certified Public Speaking Master Trainer');
+  const [speakerBio, setSpeakerBio] = useState('Praktisi komunikasi publik berlisensi resmi yang berdedikasi melatih seni komunikasi panggung berbobot.');
 
   const handleAuthorizeGoogle = () => {
     setIsAuthorizing(true);
@@ -109,13 +112,23 @@ export default function CreateEventModal({ isOpen, onClose }) {
       intake_source: 'WEB_NATIVE'
     };
 
+    const defaults = getLandingDefaults(eventType, basePrice, promoPrice);
     const landingPageConfig = {
+      ...defaults,
+      hero: {
+        kicker: 'Program Sertifikasi Kompetensi Resmi',
+        headline: landingHeadline.trim() || title.trim(),
+        subheadline: landingSubheadline.trim() || defaults.hero.subheadline
+      },
       hero_headline: landingHeadline.trim() || title.trim(),
-      hero_subheadline: landingSubheadline.trim() || undefined,
+      hero_subheadline: landingSubheadline.trim() || defaults.hero.subheadline,
       speaker: {
-        name: speakerName.trim() || undefined,
-        title: speakerTitle.trim() || undefined,
-        bio: speakerBio.trim() || undefined
+        ...defaults.speaker,
+        is_confirmed: speakerConfirmed,
+        name: speakerConfirmed ? speakerName.trim() : '',
+        title: speakerTitle.trim() || defaults.speaker.title,
+        bio: speakerBio.trim() || defaults.speaker.bio,
+        status_badge: speakerStatusBadge.trim() || (speakerConfirmed ? 'Instruktur Terverifikasi' : 'Segera Diumumkan (TBA)')
       }
     };
 
@@ -500,23 +513,43 @@ export default function CreateEventModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Profil Fasilitator / Master Trainer Dinamis */}
+          {/* Profil Fasilitator / Master Trainer Dinamis (Database-Driven) */}
           <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-            <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-              <Users className="w-3.5 h-3.5 text-amber-600" />
-              <span>Profil Fasilitator / Master Trainer</span>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber-600" />
+                <span>Profil Fasilitator / Master Trainer</span>
+              </div>
+              <label className="inline-flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={speakerConfirmed}
+                  onChange={(e) => setSpeakerConfirmed(e.target.checked)}
+                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-[11px] font-bold text-slate-700">
+                  {speakerConfirmed ? '✅ Sudah Terkonfirmasi' : '⏳ Dalam Konfirmasi (TBA)'}
+                </span>
+              </label>
             </div>
+
+            {!speakerConfirmed && (
+              <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200/80 text-[11px] text-amber-800 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0 animate-ping" />
+                <span>Status <strong>Dalam Konfirmasi (TBA)</strong> aktif. Halaman publik akan otomatis menampilkan kartu VIP Guest prestisius tanpa mengikat ke nama orang tertentu.</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                  Nama Lengkap &amp; Gelar Trainer
+                  Nama Lengkap &amp; Gelar Trainer {speakerConfirmed ? '(Wajib)' : '(Opsional/Draft)'}
                 </label>
                 <input
                   type="text"
                   value={speakerName}
                   onChange={(e) => setSpeakerName(e.target.value)}
-                  placeholder="Contoh: Halimatus Sa'diyah, S.I.Kom., M.I.Kom."
+                  placeholder={speakerConfirmed ? "Nama lengkap & gelar pemateri resmi" : "Belum ditentukan (kosongkan jika TBA)"}
                   className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
                 />
               </div>
@@ -535,17 +568,32 @@ export default function CreateEventModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Bio / Kredensial Singkat Trainer
-              </label>
-              <textarea
-                rows={2}
-                value={speakerBio}
-                onChange={(e) => setSpeakerBio(e.target.value)}
-                placeholder="Pengalaman, rekam jejak, dan keahlian pelatih..."
-                className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500 resize-none"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Label Badge Status
+                </label>
+                <input
+                  type="text"
+                  value={speakerStatusBadge}
+                  onChange={(e) => setSpeakerStatusBadge(e.target.value)}
+                  placeholder={speakerConfirmed ? "Instruktur Terverifikasi" : "Segera Diumumkan (TBA)"}
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                  Bio / Kredensial Singkat Trainer
+                </label>
+                <input
+                  type="text"
+                  value={speakerBio}
+                  onChange={(e) => setSpeakerBio(e.target.value)}
+                  placeholder="Pengalaman, rekam jejak, atau keahlian utama pemateri..."
+                  className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
             </div>
           </div>
 

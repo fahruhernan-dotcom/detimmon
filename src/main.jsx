@@ -4,12 +4,15 @@ import App from './App.jsx';
 import './index.css';
 import { AuthProvider } from './context/AuthContext.jsx';
 import { EventProvider } from './context/EventContext.jsx';
+import { ConfirmProvider } from './context/ConfirmContext.jsx';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>
       <EventProvider>
-        <App />
+        <ConfirmProvider>
+          <App />
+        </ConfirmProvider>
       </EventProvider>
     </AuthProvider>
   </React.StrictMode>

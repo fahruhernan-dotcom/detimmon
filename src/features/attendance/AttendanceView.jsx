@@ -105,8 +105,8 @@ export default function AttendanceView({
     const list = [];
     const processedKeys = new Set();
 
-    // A. Peserta dari database registrasi
-    registrants.forEach(reg => {
+    // A. Peserta dari database registrasi (hanya peserta aktif non-deleted)
+    registrants.filter(r => !r.isDeleted).forEach(reg => {
       const emailKey = (reg.email || '').toLowerCase().trim();
       const personIdKey = reg.person_id || reg.personId || reg.id;
       const key = emailKey || personIdKey;

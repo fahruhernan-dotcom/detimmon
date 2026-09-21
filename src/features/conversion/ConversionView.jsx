@@ -56,6 +56,7 @@ export default function ConversionView({
       .select('persons(email_normalized, whatsapp_normalized)')
       .eq('event_id', activeEvent.next_event_id)
       .neq('status', 'CANCELLED')
+      .is('deleted_at', null)
       .then(({ data }) => {
         if (data) setNextEventRegistrants(data);
       })
@@ -95,9 +96,9 @@ export default function ConversionView({
     return map;
   }, [attendances]);
 
-  // Transform registrants into enriched leads
+  // Transform registrants into enriched leads (exclude soft-deleted)
   const leads = useMemo(() => {
-    return registrants.map((r, idx) => {
+    return registrants.filter(r => !r.isDeleted).map((r, idx) => {
       const emailKey = (r.email || '').toLowerCase().trim();
       const waKey = String(r.whatsapp || '').replace(/[^0-9]/g, '');
       const attData = certificateMap[emailKey] || null;

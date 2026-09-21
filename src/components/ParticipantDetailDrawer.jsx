@@ -28,6 +28,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { formatRupiah, formatDate } from '../utils/formatters';
+import { useConfirm } from '../context/ConfirmContext';
 
 /**
  * ParticipantDetailDrawer — Universal right-side detail drawer adhering strictly to DRAWER_ANATOMY.md
@@ -57,6 +58,7 @@ export default function ParticipantDetailDrawer({
   onRestore,
   hasGoogleToken
 }) {
+  const confirm = useConfirm();
   const [internalNote, setInternalNote] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
@@ -533,8 +535,16 @@ export default function ParticipantDetailDrawer({
               onSoftDelete && (
                 <button
                   type="button"
-                  onClick={() => {
-                    if (window.confirm(`Pindahkan pendaftar "${participant.nama}" ke tempat sampah? Data dapat dipulihkan kapan saja.`)) {
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Pindahkan ke Tempat Sampah?',
+                      description: `Pendaftar "${participant.nama}" akan dipindahkan ke tab Sampah dan dinonaktifkan dari daftar peserta aktif.`,
+                      note: 'Data aman dan dapat dipulihkan kembali kapan saja.',
+                      variant: 'warning',
+                      confirmText: 'Pindahkan ke Sampah',
+                      cancelText: 'Batalkan'
+                    });
+                    if (ok) {
                       onSoftDelete(participant.id);
                       onClose();
                     }

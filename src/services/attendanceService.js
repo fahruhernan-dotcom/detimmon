@@ -69,6 +69,7 @@ export const attendanceService = {
           registration_member_id,
           registrations (
             person_id,
+            deleted_at,
             persons (
               id,
               full_name
@@ -87,6 +88,10 @@ export const attendanceService = {
 
       if (tktErr || !ticketData) {
         throw new Error(`Tiket "${ticketCode}" tidak ditemukan di database.`);
+      }
+
+      if (ticketData.registrations?.deleted_at) {
+        throw new Error(`Tiket "${ticketCode}" tidak dapat dipresensi karena pendaftaran berada di tempat sampah.`);
       }
 
       // Jika tiket MABAR, ambil person_id dari registration_members

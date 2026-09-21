@@ -51,9 +51,12 @@ export default function EmailLayoutVerificationView({
   // 4. Design Theme: 'white' (Luxury Minimal) | 'dark' (Classic Dark Gold)
   const [theme, setTheme] = useState('white');
 
+  // Active registrants only (exclude trash)
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+
   // 5. Selected Participant ID or 'custom'
   const [selectedParticipantId, setSelectedParticipantId] = useState(
-    registrants.length > 0 ? registrants[0].id : 'custom'
+    activeRegistrants.length > 0 ? activeRegistrants[0].id : 'custom'
   );
 
   // 6. Form Parameter State
@@ -98,7 +101,7 @@ export default function EmailLayoutVerificationView({
   // Sync parameters when selected registrant changes
   useEffect(() => {
     if (selectedParticipantId === 'custom') return;
-    const found = registrants.find(r => String(r.id) === String(selectedParticipantId));
+    const found = activeRegistrants.find(r => String(r.id) === String(selectedParticipantId));
     if (found) {
       setParams(prev => ({
         ...prev,
@@ -356,7 +359,7 @@ export default function EmailLayoutVerificationView({
                 className="w-full text-xs font-medium rounded-xl border border-slate-300 bg-slate-50/50 px-3 py-2.5 text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all"
               >
                 <option value="custom">-- Data Manual / Kustom --</option>
-                {registrants.map((r) => (
+                {activeRegistrants.map((r) => (
                   <option key={r.id} value={r.id}>
                     {r.nama} ({r.nomorTicket || `No. ${r.id}`}) - {r.kategori}
                   </option>

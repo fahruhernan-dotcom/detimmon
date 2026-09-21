@@ -27,7 +27,7 @@ export default function FinancialPnl({
   let customCount = 0;
   let customRevenue = 0;
 
-  registrants.forEach((r) => {
+  registrants.filter(r => !r.isDeleted).forEach((r) => {
     if (r.statusBayar === 'LUNAS') {
       const nom = typeof r.nominal === 'number' ? r.nominal : (parseInt(String(r.nominal).replace(/[^0-9]/g, '')) || 0);
       totalRevenue += nom;

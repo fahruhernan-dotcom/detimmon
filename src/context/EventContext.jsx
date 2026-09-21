@@ -51,6 +51,7 @@ export function EventProvider({ children }) {
       const { data, error } = await supabase
         .from('events')
         .select('*, registrations(count)')
+        .filter('registrations.deleted_at', 'is', null)
         .order('date_start', { ascending: true });
 
       if (error) throw error;

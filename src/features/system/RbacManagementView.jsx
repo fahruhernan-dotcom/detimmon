@@ -22,6 +22,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import { staffAccessService } from '../../services/staffAccessService';
 
 /**
@@ -32,6 +33,7 @@ import { staffAccessService } from '../../services/staffAccessService';
  * - Live permission matrix
  */
 export default function RbacManagementView() {
+  const confirm = useConfirm();
   const { user: authUser, role: currentRole, isOwner } = useAuth();
 
   const [staffList, setStaffList] = useState([]);
@@ -152,18 +154,27 @@ export default function RbacManagementView() {
 
   const handleDeleteMember = async (staff) => {
     if (staff.role === 'OWNER') {
-      alert('Akun Owner utama tidak dapat dihapus dari sistem.');
+      setStatusMessage({ type: 'error', text: 'Akun Owner utama dilindungi dan tidak dapat dihapus dari sistem.' });
       return;
     }
 
-    if (window.confirm(`Hapus staf "${staff.full_name}" (${staff.email}) dari whitelist akses?`)) {
+    const ok = await confirm({
+      title: 'Hapus Akses Staf?',
+      description: `Apakah Anda yakin ingin menghapus staf "${staff.full_name}" (${staff.email}) dari whitelist akses Command Center?`,
+      note: 'Staf ini tidak akan dapat login lagi ke sistem internal.',
+      variant: 'danger',
+      confirmText: 'Hapus Akses',
+      cancelText: 'Batalkan'
+    });
+
+    if (ok) {
       setActionLoading(true);
       try {
         await staffAccessService.deleteStaff(staff.id);
         await loadStaffData();
         setStatusMessage({ type: 'success', text: `Staf "${staff.full_name}" berhasil dihapus dari sistem.` });
       } catch (err) {
-        alert('Gagal menghapus staf: ' + err.message);
+        setStatusMessage({ type: 'error', text: 'Gagal menghapus staf: ' + err.message });
       } finally {
         setActionLoading(false);
       }

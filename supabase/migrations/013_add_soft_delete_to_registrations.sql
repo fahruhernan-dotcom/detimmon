@@ -86,11 +86,8 @@ BEGIN
 END;
 $$;
 
--- 5. PERMISSIONS FOR AUTHENTICATED STAFF
-REVOKE ALL ON FUNCTION public.soft_delete_registration(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.soft_delete_registration(UUID) TO authenticated, service_role;
-
-REVOKE ALL ON FUNCTION public.restore_registration(UUID) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.restore_registration(UUID) TO authenticated, service_role;
+-- 5. PERMISSIONS FOR AUTHENTICATED STAFF & OPERATOR PASSKEY (ANON)
+GRANT EXECUTE ON FUNCTION public.soft_delete_registration(UUID) TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.restore_registration(UUID) TO anon, authenticated, service_role;
 
 COMMENT ON COLUMN public.registrations.deleted_at IS 'Timestamp soft delete. Jika NULL berarti aktif, jika berisi timestamp berarti berada di tempat sampah (trash).';

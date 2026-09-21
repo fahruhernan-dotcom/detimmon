@@ -11,7 +11,8 @@ import {
   Users,
   Eye,
   Sparkles,
-  Globe
+  Globe,
+  Trash2
 } from 'lucide-react';
 import { formatRupiah, formatDate } from '../../utils/formatters';
 
@@ -36,8 +37,19 @@ export default function RegistrantsView({
   const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [packageFilter, setPackageFilter] = useState('all');
 
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+  const deletedRegistrants = useMemo(() => registrants.filter(r => r.isDeleted), [registrants]);
+
   const filteredData = useMemo(() => {
     return registrants.filter((item) => {
+      // Trash filter: if trash tab is selected, show only soft-deleted items
+      if (statusFilter === 'trash') {
+        if (!item.isDeleted) return false;
+      } else {
+        // Exclude soft-deleted items from all normal active tabs
+        if (item.isDeleted) return false;
+      }
+
       // Status filter
       if (statusFilter === 'pending' && item.statusBayar !== 'PENDING') return false;
       if (statusFilter === 'lunas' && item.statusBayar !== 'LUNAS') return false;
@@ -90,7 +102,7 @@ export default function RegistrantsView({
                 statusFilter === 'all' ? 'bg-white text-slate-950 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Semua ({registrants.length})
+              Semua ({activeRegistrants.length})
             </button>
             <button
               onClick={() => setStatusFilter('lunas')}
@@ -98,7 +110,7 @@ export default function RegistrantsView({
                 statusFilter === 'lunas' ? 'bg-white text-emerald-800 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Lunas ({registrants.filter(r => r.statusBayar === 'LUNAS').length})
+              Lunas ({activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length})
             </button>
             <button
               onClick={() => setStatusFilter('pending')}
@@ -106,8 +118,20 @@ export default function RegistrantsView({
                 statusFilter === 'pending' ? 'bg-white text-amber-900 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Pending ({registrants.filter(r => r.statusBayar === 'PENDING').length})
+              Pending ({activeRegistrants.filter(r => r.statusBayar === 'PENDING').length})
             </button>
+            {deletedRegistrants.length > 0 && (
+              <button
+                onClick={() => setStatusFilter('trash')}
+                className={`px-3 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
+                  statusFilter === 'trash' ? 'bg-rose-50 text-rose-800 font-bold shadow-2xs border border-rose-200' : 'text-slate-500 hover:text-rose-700'
+                }`}
+                title="Lihat pendaftar yang berada di tempat sampah"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
+                <span>Sampah ({deletedRegistrants.length})</span>
+              </button>
+            )}
           </div>
 
           {/* Mode Verifikasi Kilat (Speed Queue CTA) - Selalu Tampil */}
@@ -118,7 +142,7 @@ export default function RegistrantsView({
               title="Buka Mode Verifikasi Kilat: preview bukti & verifikasi beruntun 1-klik"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Verifikasi Kilat {registrants.filter(r => r.statusBayar === 'PENDING').length > 0 ? `(${registrants.filter(r => r.statusBayar === 'PENDING').length} Pending)` : ''}</span>
+              <span>Verifikasi Kilat {activeRegistrants.filter(r => r.statusBayar === 'PENDING').length > 0 ? `(${activeRegistrants.filter(r => r.statusBayar === 'PENDING').length} Pending)` : ''}</span>
             </button>
           )}
 
@@ -156,6 +180,25 @@ export default function RegistrantsView({
           </button>
         </div>
       </div>
+
+      {/* Notice Banner jika sedang di tab Sampah */}
+      {statusFilter === 'trash' && (
+        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center justify-between animate-fade-in">
+          <div className="flex items-center gap-2">
+            <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>
+              Menampilkan <strong>{deletedRegistrants.length} pendaftar</strong> di Tempat Sampah. Klik baris pendaftar untuk melihat detail atau memulihkannya.
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setStatusFilter('all')}
+            className="text-[11px] font-bold text-rose-700 hover:text-rose-900 underline underline-offset-2 cursor-pointer"
+          >
+            Kembali ke Peserta Aktif
+          </button>
+        </div>
+      )}
 
       {/* ── CLEAN PARTICIPANT TABLE ─────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
@@ -290,7 +333,7 @@ export default function RegistrantsView({
 
         {/* Footer Count */}
         <div className="p-4 bg-slate-50/70 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
-          <span>Menampilkan <strong>{filteredData.length}</strong> dari <strong>{registrants.length}</strong> peserta</span>
+          <span>Menampilkan <strong>{filteredData.length}</strong> dari <strong>{statusFilter === 'trash' ? deletedRegistrants.length : activeRegistrants.length}</strong> peserta {statusFilter === 'trash' ? '(Tempat Sampah)' : ''}</span>
           <span className="text-[11px] text-slate-400">Klik baris peserta untuk membuka panel detail di sebelah kanan</span>
         </div>
       </div>

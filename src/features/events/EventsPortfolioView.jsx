@@ -53,23 +53,25 @@ export default function EventsPortfolioView({
   const [generatingDriveId, setGeneratingDriveId] = useState(null);
 
   // ── Calculate Macro Ecosystem Metrics ──────────────────────
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+
   const ecosystemStats = useMemo(() => {
     const totalEvents = events.length;
     const webinarCount = events.filter(e => e.event_type === 'WEBINAR').length;
     const bootcampCount = events.filter(e => e.event_type === 'BOOTCAMP').length;
     const workshopCount = events.filter(e => e.event_type === 'WORKSHOP').length;
 
-    // Total participants strictly derived from real data
+    // Total participants strictly derived from real active data
     const totalEcosystemPax = events.reduce((sum, e) => {
       const count = (e.id === activeEventId)
-        ? registrants.length
+        ? activeRegistrants.length
         : (e.enrolled_count || 0);
       return sum + count;
     }, 0);
 
     const totalGrossRevenue = events.reduce((sum, e) => {
       const paxLunas = (e.id === activeEventId)
-        ? registrants.filter(r => r.statusBayar === 'LUNAS').length
+        ? activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length
         : 0;
       return sum + (paxLunas * (e.promo_price || e.base_price || 0));
     }, 0);
@@ -77,8 +79,8 @@ export default function EventsPortfolioView({
     // Calculate conversion rate dynamically from real participant counts
     const webinarEvt = events.find(e => e.event_type === 'WEBINAR');
     const bootcampEvt = events.find(e => e.event_type === 'BOOTCAMP');
-    const webinarPax = webinarEvt ? (webinarEvt.id === activeEventId ? registrants.length : (webinarEvt.enrolled_count || 0)) : 0;
-    const bootcampPax = bootcampEvt ? (bootcampEvt.id === activeEventId ? registrants.length : (bootcampEvt.enrolled_count || 0)) : 0;
+    const webinarPax = webinarEvt ? (webinarEvt.id === activeEventId ? activeRegistrants.length : (webinarEvt.enrolled_count || 0)) : 0;
+    const bootcampPax = bootcampEvt ? (bootcampEvt.id === activeEventId ? activeRegistrants.length : (bootcampEvt.enrolled_count || 0)) : 0;
     const avgConversionRate = webinarPax > 0 ? Math.round((bootcampPax / webinarPax) * 100) : 0;
 
     return {
@@ -90,7 +92,7 @@ export default function EventsPortfolioView({
       totalGrossRevenue,
       avgConversionRate
     };
-  }, [events, activeEventId, registrants]);
+  }, [events, activeEventId, activeRegistrants]);
 
   // Filtered Events
   const filteredEvents = useMemo(() => {
@@ -428,7 +430,7 @@ export default function EventsPortfolioView({
             const next = evt.next_event_id ? events.find(e => e.id === evt.next_event_id) : null;
 
             const enrolled = (evt.id === activeEventId)
-              ? registrants.length
+              ? activeRegistrants.length
               : (evt.enrolled_count || 0);
             const capacity = evt.capacity || 50;
             const progressPercent = capacity > 0 ? Math.min(100, Math.round((enrolled / capacity) * 100)) : 0;

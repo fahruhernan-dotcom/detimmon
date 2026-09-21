@@ -1,42 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, BookOpen, Coffee, Utensils, Award, Users, CheckCircle2, Mic2, Sparkles, ChevronRight, FileText } from 'lucide-react';
+import { Calendar, Clock, BookOpen, Coffee, Utensils, Award, Users, CheckCircle2, Mic2, Sparkles, ChevronRight, FileText, ArrowRight } from 'lucide-react';
 import { rundownService } from '../../services/rundownService';
 
-// Konfigurasi visual badge tipe sesi ramah mata (High Contrast Light Palette)
+// Konfigurasi visual badge tipe sesi ramah mata (Dignified Neutral & Subtle Accent Palette)
 const SESSION_TYPE_CONFIG = {
   CEREMONY: {
     label: 'Pembukaan & Protokoler',
-    bg: 'bg-blue-100 text-blue-950 border-blue-200',
+    bg: 'bg-slate-100 text-slate-800 border-slate-200',
     icon: Award
   },
   KEYNOTE: {
     label: 'Kuliah Teori & Materi Utama',
-    bg: 'bg-indigo-100 text-indigo-950 border-indigo-200',
+    bg: 'bg-[#0A192F]/5 text-[#0A192F] border-[#0A192F]/20 font-semibold',
     icon: BookOpen
   },
   PRACTICE: {
     label: 'Praktik Panggung Langsung',
-    bg: 'bg-emerald-100 text-emerald-950 border-emerald-200',
+    bg: 'bg-[#0A192F] text-amber-300 border-[#0A192F] font-semibold',
     icon: Mic2
   },
   DEMO: {
     label: 'Simulasi & Evaluasi Personal',
-    bg: 'bg-amber-100 text-amber-950 border-amber-200',
+    bg: 'bg-slate-100 text-slate-900 border-slate-300 font-medium',
     icon: Sparkles
   },
   BREAK: {
-    label: 'Rehat Kopi & Snack Pagi/Sore',
-    bg: 'bg-yellow-100 text-yellow-950 border-yellow-200',
+    label: 'Rehat Kopi & Snack',
+    bg: 'bg-slate-50 text-slate-600 border-slate-200',
     icon: Coffee
   },
   MEAL: {
     label: 'ISHOMA (Makan Siang & Sholat)',
-    bg: 'bg-slate-200 text-slate-900 border-slate-300',
+    bg: 'bg-slate-100 text-slate-700 border-slate-200',
     icon: Utensils
   },
   EVALUATION: {
     label: 'Ujian Mandiri & Post-Test',
-    bg: 'bg-purple-100 text-purple-950 border-purple-200',
+    bg: 'bg-amber-50 text-amber-900 border-amber-200 font-semibold',
     icon: CheckCircle2
   }
 };
@@ -88,9 +88,9 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
         
         {/* Header Seksi */}
         <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 border border-blue-200 text-blue-950 text-xs sm:text-sm font-bold mb-3">
-            <Clock className="w-4 h-4 text-blue-900" />
-            <span>JADWAL RESMI & RUNDOWN MENIT-KE-MENIT</span>
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-100 border border-slate-300 text-slate-800 text-xs font-bold mb-3 tracking-wide">
+            <Clock className="w-3.5 h-3.5 text-[#0A192F]" />
+            <span className="uppercase tracking-wider">Jadwal Resmi & Rundown Kegiatan</span>
           </div>
           <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-display">
             Agenda Kegiatan & Kurikulum Praktik
@@ -110,13 +110,13 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
                   key={sched.id}
                   type="button"
                   onClick={() => setActiveScheduleId(sched.id)}
-                  className={`px-5 py-3 rounded-xl font-bold text-sm sm:text-base transition-all flex items-center gap-2.5 border-2 shadow-sm ${
+                  className={`px-5 py-3 rounded-xl font-bold text-sm sm:text-base btn-press flex items-center gap-2.5 border transition-all ${
                     isActive
-                      ? 'bg-blue-900 text-amber-300 border-blue-950 shadow-md scale-102'
-                      : 'bg-white text-slate-700 hover:text-blue-950 hover:bg-slate-100 border-slate-200'
+                      ? 'bg-[#0A192F] text-[#D4AF37] border-[#0A192F] shadow-sm'
+                      : 'bg-white text-slate-700 hover:text-slate-950 hover:bg-slate-50 border-slate-200'
                   }`}
                 >
-                  <Calendar className={`w-4 h-4 ${isActive ? 'text-amber-400' : 'text-slate-400'}`} />
+                  <Calendar className={`w-4 h-4 ${isActive ? 'text-[#D4AF37]' : 'text-slate-400'}`} />
                   <span>Hari ke-{sched.day_number}: {sched.title?.split(':')[0] || `Hari ${sched.day_number}`}</span>
                 </button>
               );
@@ -128,7 +128,7 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
         {activeSchedule && (
           <div className="bg-white rounded-xl p-4 sm:p-5 border border-slate-200 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
             <div>
-              <span className="text-xs font-bold text-blue-800 uppercase tracking-wide">Fokus Pembelajaran:</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Fokus Pembelajaran:</span>
               <div className="text-base sm:text-lg font-bold text-slate-900 mt-0.5">
                 {activeSchedule.title || `Jadwal Hari ke-${activeSchedule.day_number}`}
               </div>
@@ -139,9 +139,10 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
             <button
               type="button"
               onClick={onRegisterClick}
-              className="px-4 py-2 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 text-xs sm:text-sm font-bold transition-colors shrink-0"
+              className="px-4 py-2 rounded-lg bg-[#0A192F] hover:bg-[#112240] text-[#D4AF37] text-xs sm:text-sm font-bold flex items-center gap-1.5 btn-press shrink-0"
             >
-              Amankan Kursi Pelatihan ➔
+              <span>Amankan Kursi Pelatihan</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -149,7 +150,7 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
         {/* Daftar Sesi Jam-ke-Jam */}
         {loading ? (
           <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 text-slate-500 text-sm">
-            <div className="w-8 h-8 border-3 border-blue-900 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <div className="w-8 h-8 border-3 border-[#0A192F] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
             <span>Memuat susunan jadwal terverifikasi...</span>
           </div>
         ) : items.length === 0 ? (
@@ -166,7 +167,7 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
               return (
                 <div
                   key={item.id || idx}
-                  className={`rounded-2xl border transition-all hover:shadow-md ${
+                  className={`rounded-2xl border card-lift ${
                     isBreak
                       ? 'bg-slate-100/80 border-slate-300'
                       : 'bg-white border-slate-200'
@@ -174,8 +175,8 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
                 >
                   {/* Bagian Kiri: Jam & Lencana Tipe Sesi */}
                   <div className="flex items-start gap-4 min-w-[220px]">
-                    <div className="w-12 h-12 rounded-xl bg-blue-50 border border-blue-200 flex flex-col items-center justify-center text-blue-950 shrink-0">
-                      <Clock className="w-5 h-5 text-blue-900" />
+                    <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex flex-col items-center justify-center text-[#0A192F] shrink-0">
+                      <Clock className="w-5 h-5 text-[#0A192F]" />
                     </div>
                     <div>
                       <div className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight">
@@ -202,9 +203,9 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
                       </p>
                     )}
                     {item.speaker_name && (
-                      <div className="flex items-center gap-1.5 text-xs text-blue-900 font-semibold mt-2">
-                        <span>Fasilitator / PIC:</span>
-                        <strong className="text-slate-800">{item.speaker_name}</strong>
+                      <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium mt-2">
+                        <span>Fasilitator:</span>
+                        <strong className="text-slate-900 font-semibold">{item.speaker_name}</strong>
                       </div>
                     )}
                   </div>
@@ -222,20 +223,20 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
         )}
 
         {/* Footer Rundown: Tombol Download & Ajakan Daftar */}
-        <div className="mt-8 p-6 bg-white rounded-2xl border border-blue-900/15 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+        <div className="mt-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
           <div>
             <div className="text-sm font-bold text-slate-900">
-              Ingin menyimpan jadwal atau mengajukan izin ke pimpinan kantor?
+              Ingin menyimpan jadwal atau mengajukan izin dinas ke instansi?
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              Rundown resmi dan susunan materi lengkap dapat diunduh dalam format PDF.
+              Rundown resmi dan susunan materi lengkap dapat diunduh atau dicetak secara langsung.
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => window.print()}
-              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold border border-slate-300 transition-colors flex items-center gap-1.5"
+              className="px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs sm:text-sm font-bold border border-slate-300 btn-press flex items-center gap-1.5"
             >
               <FileText className="w-4 h-4 text-slate-600" />
               <span>Cetak / Simpan PDF</span>
@@ -243,9 +244,10 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
             <button
               type="button"
               onClick={onRegisterClick}
-              className="px-5 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-950 text-amber-300 text-xs sm:text-sm font-bold shadow-sm transition-all"
+              className="px-5 py-2.5 rounded-xl bg-[#0A192F] hover:bg-[#112240] text-[#D4AF37] text-xs sm:text-sm font-bold shadow-xs btn-press flex items-center gap-1.5"
             >
-              Daftar Sekarang ➔
+              <span>Daftar Sekarang</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>

@@ -118,7 +118,7 @@ export default function TemplateStudioView({
     CERTIFICATE_NO: 'LPK-DIGNITY/CERT/2026/000184',
     VERIFICATION_CODE: 'dgn-a78b9c',
     VOUCHER_CODE: 'REBATE100K-001',
-    SPEAKER_NAME: "Halimatus Sa'diyah, M.I.Kom."
+    SPEAKER_NAME: activeEvent?.landing_page_config?.speaker?.name || activeEvent?.speaker_name || "Master Trainer (TBA)"
   };
 
   const renderSampleText = (raw) => {

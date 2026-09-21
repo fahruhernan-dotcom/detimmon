@@ -21,7 +21,6 @@ export default function CertificateModal({
 }) {
   if (!isOpen || !certData) return null;
 
-  const [activeSpeaker, setActiveSpeaker] = useState(initialSpeaker || 'diyah');
   const [copiedLink, setCopiedLink] = useState(false);
 
   const recipientName = normalizeCertificateName(certData.nama || certData.normalized_name);
@@ -34,13 +33,17 @@ export default function CertificateModal({
   const verificationUrl = `${baseUrl}#/verify/${encodeURIComponent(verificationCode)}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(verificationUrl)}`;
 
-  const speakerName = activeSpeaker === 'diyah'
-    ? "Halimatus Sa'diyah, S.I.Kom., M.I.Kom."
-    : "Willy Tan";
+  const dynamicDefaultSpeakerName = certData.speaker_name || 
+    certData.events?.landing_page_config?.speaker?.name || 
+    certData.events?.speaker_name ||
+    "Master Trainer LPK Dignity";
 
-  const speakerTitle = activeSpeaker === 'diyah'
-    ? "Practitioner & Founder Adikara"
-    : "Certified Trainer & Founder BraveSpeakers";
+  const dynamicDefaultSpeakerTitle = certData.speaker_title ||
+    certData.events?.landing_page_config?.speaker?.title ||
+    "Lead Facilitator & Certified Coach LPK Dignity";
+
+  const [speakerName, setSpeakerName] = useState(dynamicDefaultSpeakerName);
+  const [speakerTitle, setSpeakerTitle] = useState(dynamicDefaultSpeakerTitle);
 
   const handlePrint = () => {
     window.print();
@@ -93,30 +96,16 @@ export default function CertificateModal({
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Speaker Selector Toggle */}
-            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-xs font-semibold">
-              <button
-                type="button"
-                onClick={() => setActiveSpeaker('diyah')}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  activeSpeaker === 'diyah'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Mbak Diyah
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveSpeaker('willy')}
-                className={`px-2.5 py-1 rounded-lg transition-all ${
-                  activeSpeaker === 'willy'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                Coach Willy
-              </button>
+            {/* Dynamic Speaker Selector / Quick Editor */}
+            <div className="flex items-center gap-1.5 bg-slate-100 px-2 py-1 rounded-xl text-xs">
+              <span className="text-slate-500 font-medium text-[11px] shrink-0">Narasumber:</span>
+              <input
+                type="text"
+                value={speakerName}
+                onChange={(e) => setSpeakerName(e.target.value)}
+                placeholder="Nama & Gelar Narasumber..."
+                className="bg-white border border-slate-200 rounded-lg px-2 py-0.5 text-xs text-slate-800 font-semibold focus:outline-none focus:border-amber-500 w-44"
+              />
             </div>
 
             <button

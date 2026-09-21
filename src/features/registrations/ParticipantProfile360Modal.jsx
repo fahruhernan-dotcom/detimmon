@@ -70,13 +70,19 @@ export default function ParticipantProfile360Modal({
                   <h3 className="text-base font-bold text-slate-950 truncate tracking-tight">
                     {participant.nama}
                   </h3>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
-                    isLunas 
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                      : 'bg-amber-50 text-amber-900 border-amber-200'
-                  }`}>
-                    {isLunas ? 'VERIFIED LUNAS' : 'PENDING'}
-                  </span>
+                  {participant.isDeleted ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border bg-rose-50 text-rose-700 border-rose-200">
+                      DI TEMPAT SAMPAH
+                    </span>
+                  ) : (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
+                      isLunas 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                        : 'bg-amber-50 text-amber-900 border-amber-200'
+                    }`}>
+                      {isLunas ? 'VERIFIED LUNAS' : 'PENDING'}
+                    </span>
+                  )}
                 </div>
 
                 <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap mt-0.5">

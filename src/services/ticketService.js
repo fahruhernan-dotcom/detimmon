@@ -204,6 +204,7 @@ export const ticketService = {
             id,
             package_type,
             status,
+            deleted_at,
             persons (
               id,
               full_name,
@@ -220,8 +221,12 @@ export const ticketService = {
         .eq('ticket_code', ticketCode.trim())
         .single();
 
-      if (error) {
+      if (error || !data) {
         return { valid: false, message: 'Tiket tidak ditemukan' };
+      }
+
+      if (data.registrations?.deleted_at) {
+        return { valid: false, message: 'Tiket tidak aktif karena pendaftaran berada di tempat sampah.' };
       }
 
       return {

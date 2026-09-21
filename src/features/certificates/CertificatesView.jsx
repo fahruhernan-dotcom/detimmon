@@ -104,10 +104,12 @@ export default function CertificatesView({
       const isIssued = Boolean(item.nomorSertifikat || item.statusSertifikat === 'SELESAI' || item.status === 'GENERATED' || item.certificate_no);
       const isSent = item.statusEmailSertifikat === 'TERKIRIM' || item.status === 'SENT';
 
-      // Find matching registrant for additional details
+      // Find matching registrant for additional details (prefer active registrant)
       const matchedReg = registrants.find(r => 
-        (r.nomorTicket && r.nomorTicket === item.nomorTicket) ||
-        (r.email && r.email.toLowerCase() === (item.email || '').toLowerCase())
+        !r.isDeleted && (
+          (r.nomorTicket && r.nomorTicket === item.nomorTicket) ||
+          (r.email && r.email.toLowerCase() === (item.email || '').toLowerCase())
+        )
       );
 
       list.push({

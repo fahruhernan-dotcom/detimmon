@@ -46,13 +46,15 @@ export default function PaymentsView({
   const [rejectReasonCategory, setRejectReasonCategory] = useState('Bukti Buram / Tidak Terbaca');
   const [rejectCustomNote, setRejectCustomNote] = useState('');
 
-  // Counts for tabs
-  const pendingCount = registrants.filter(r => r.statusBayar === 'PENDING').length;
-  const verifiedCount = registrants.filter(r => r.statusBayar === 'LUNAS').length;
-  const rejectedCount = registrants.filter(r => r.statusBayar === 'DITOLAK' || r.statusBayar === 'REJECTED').length;
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+
+  // Counts for tabs (exclude soft-deleted)
+  const pendingCount = activeRegistrants.filter(r => r.statusBayar === 'PENDING').length;
+  const verifiedCount = activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length;
+  const rejectedCount = activeRegistrants.filter(r => r.statusBayar === 'DITOLAK' || r.statusBayar === 'REJECTED').length;
 
   const filteredData = useMemo(() => {
-    return registrants.filter((item) => {
+    return activeRegistrants.filter((item) => {
       // Tab filter
       if (activeTab === 'pending' && item.statusBayar !== 'PENDING') return false;
       if (activeTab === 'verified' && item.statusBayar !== 'LUNAS') return false;
@@ -78,7 +80,7 @@ export default function PaymentsView({
       }
       return true;
     });
-  }, [registrants, activeTab, packageFilter, proofFilter, search]);
+  }, [activeRegistrants, activeTab, packageFilter, proofFilter, search]);
 
   const handleConfirmReject = () => {
     if (!rejectingParticipant) return;
@@ -86,10 +88,9 @@ export default function PaymentsView({
       ? `${rejectReasonCategory}: ${rejectCustomNote.trim()}`
       : rejectReasonCategory;
 
-    if (onRejectPaymentWithReason) {
-      onRejectPaymentWithReason(rejectingParticipant.id, fullReason);
-    }
+    onRejectPaymentWithReason(rejectingParticipant.id, fullReason);
     setRejectingParticipant(null);
+    setRejectReasonCategory('Bukti transfer buram/tidak terbaca');
     setRejectCustomNote('');
   };
 
@@ -144,7 +145,7 @@ export default function PaymentsView({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Semua ({registrants.length})
+              Semua ({activeRegistrants.length})
             </button>
           </div>
 

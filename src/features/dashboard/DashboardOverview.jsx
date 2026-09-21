@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   AlertCircle, 
   CheckCircle2, 
@@ -13,7 +13,8 @@ import {
   TrendingUp, 
   Calendar,
   Sparkles,
-  Link2
+  Link2,
+  Trash2
 } from 'lucide-react';
 import { useEvent } from '../../context/EventContext';
 import { formatRupiah, formatDate } from '../../utils/formatters';
@@ -37,31 +38,35 @@ export default function DashboardOverview({
   const nextEvent = activeEvent?.next_event_id ? events.find(e => e.id === activeEvent.next_event_id) : null;
   const parentEvent = activeEvent?.parent_event_id ? events.find(e => e.id === activeEvent.parent_event_id) : null;
 
+  // ── 0. Active vs Soft-Deleted Registrants ──────────────────
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+  const deletedRegistrants = useMemo(() => registrants.filter(r => r.isDeleted), [registrants]);
+
   // ── 1. Calculate Action Inbox Items ────────────────────────
-  const pendingPayments = registrants.filter(r => r.statusBayar === 'PENDING');
-  const unreviewedProofs = registrants.filter(r => r.statusBayar === 'PENDING' && Boolean(r.buktiBayar));
-  const unsentTickets = registrants.filter(r => r.statusBayar === 'LUNAS' && r.statusEmailTicket !== 'TERKIRIM');
+  const pendingPayments = activeRegistrants.filter(r => r.statusBayar === 'PENDING');
+  const unreviewedProofs = activeRegistrants.filter(r => r.statusBayar === 'PENDING' && Boolean(r.buktiBayar));
+  const unsentTickets = activeRegistrants.filter(r => r.statusBayar === 'LUNAS' && r.statusEmailTicket !== 'TERKIRIM');
   const unsentCertificates = attendances.filter(a => a.statusSertifikat !== 'SELESAI');
 
   // ── 2. Calculate Revenue Metrics ───────────────────────────
-  const verifiedRevenue = registrants
+  const verifiedRevenue = activeRegistrants
     .filter(r => r.statusBayar === 'LUNAS')
     .reduce((acc, r) => acc + (r.nominal || 0), 0);
 
-  const pendingRevenue = registrants
+  const pendingRevenue = activeRegistrants
     .filter(r => r.statusBayar === 'PENDING')
     .reduce((acc, r) => acc + (r.nominal || 0), 0);
 
   const expectedTotalRevenue = verifiedRevenue + pendingRevenue;
 
   // ── 3. Operational KPIs ────────────────────────────────────
-  const totalPeserta = registrants.length;
-  const verifiedBayarCount = registrants.filter(r => r.statusBayar === 'LUNAS').length;
+  const totalPeserta = activeRegistrants.length;
+  const verifiedBayarCount = activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length;
   const hadirCount = attendances.length;
-  const tiketTerkirimCount = registrants.filter(r => r.statusEmailTicket === 'TERKIRIM').length;
+  const tiketTerkirimCount = activeRegistrants.filter(r => r.statusEmailTicket === 'TERKIRIM').length;
 
-  // ── 4. Recent Activity (Derived from last registrants) ──────
-  const recentActivities = [...registrants]
+  // ── 4. Recent Activity (Derived from last active registrants) ──────
+  const recentActivities = [...activeRegistrants]
     .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
     .slice(0, 5)
     .map(item => {
@@ -234,6 +239,24 @@ export default function DashboardOverview({
                   <ArrowRight className="w-3 h-3 text-slate-400" />
                 </button>
               </div>
+
+              {/* Item 5: Trash Notification (if any) */}
+              {deletedRegistrants.length > 0 && (
+                <div className="p-3 rounded-xl border border-dashed border-rose-200 bg-rose-50/40 text-rose-900 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span className="text-xs text-rose-800 font-medium">
+                      <strong>{deletedRegistrants.length} pendaftar</strong> berada di Tempat Sampah (tidak dihitung di data aktif)
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => onNavigateTab('registrants')}
+                    className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white border border-rose-200 text-rose-700 hover:bg-rose-50 shadow-2xs transition-all shrink-0 ml-2"
+                  >
+                    Buka Sampah
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -37,6 +37,13 @@
     --sidebar-width: 17rem;
     --sidebar-width-mobile: 18rem;
     --sidebar-width-icon: 3.5rem;
+
+    /* Emil Kowalski Motion Design Tokens */
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    --duration-fast: 140ms;
+    --duration-normal: 220ms;
   }
 
   body {
@@ -53,14 +60,58 @@
   box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.03), 0 6px 16px -2px rgba(0, 0, 0, 0.02);
 }
 
-.glass-card-hover {
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+.shadow-executive {
+  box-shadow: 0 4px 6px -1px rgba(10, 25, 47, 0.03), 0 20px 45px -4px rgba(10, 25, 47, 0.07);
 }
 
-.glass-card-hover:hover {
-  border-color: rgba(217, 119, 6, 0.4);
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
-  transform: translateY(-1.5px);
+.border-hairline {
+  border-color: rgba(226, 232, 240, 0.9);
+}
+
+.glass-card-hover {
+  transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .glass-card-hover:hover {
+    border-color: rgba(217, 119, 6, 0.4);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.06), 0 1px 2px 0 rgba(0, 0, 0, 0.03);
+    transform: translateY(-1.5px);
+  }
+}
+
+/* Emil Kowalski Tactile Button Press Feedback */
+.btn-press {
+  transition: transform var(--duration-fast) var(--ease-out), box-shadow var(--duration-fast) var(--ease-out), background-color var(--duration-fast) var(--ease-out);
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* Emil Kowalski Micro Card Lift */
+.card-lift {
+  transition: transform var(--duration-normal) var(--ease-out), box-shadow var(--duration-normal) var(--ease-out), border-color var(--duration-normal) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .card-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08), 0 8px 10px -6px rgba(15, 23, 42, 0.04);
+  }
+}
+
+/* Smooth Height FAQ Accordion Transition */
+.faq-accordion-grid {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duration-normal) var(--ease-out), opacity var(--duration-normal) var(--ease-out);
+  opacity: 0;
+}
+.faq-accordion-grid.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+.faq-accordion-inner {
+  overflow: hidden;
 }
 
 /* Breathing Micro-interaction for Status Indicators */
@@ -121,3 +172,23 @@
     z-index: 99999 !important;
   }
 }
+
+/* Emil Kowalski Accessibility: prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .btn-press:active {
+    transform: none !important;
+  }
+  .card-lift:hover {
+    transform: none !important;
+  }
+  .breathing-dot {
+    animation: none !important;
+  }
+}
+

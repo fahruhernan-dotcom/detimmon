@@ -39,8 +39,10 @@ import ShiftTimelineModal from './ShiftTimelineModal';
 import ScheduleItemModal from './ScheduleItemModal';
 import TeleprompterModal from './TeleprompterModal';
 import ImportRundownModal from './ImportRundownModal';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function RundownStageView() {
+  const confirm = useConfirm();
   const { activeEvent } = useEvent();
   const eventId = activeEvent?.id || 'default-event';
 
@@ -122,7 +124,16 @@ export default function RundownStageView() {
   };
 
   const handleDeleteItem = async (id) => {
-    if (window.confirm('Yakin ingin menghapus sesi ini dari rundown?')) {
+    const item = items.find(i => i.id === id);
+    const ok = await confirm({
+      title: 'Hapus Sesi Rundown?',
+      description: `Sesi "${item?.session_title || 'ini'}" akan dihapus dari jadwal rundown acara.`,
+      note: 'Item jadwal yang dihapus tidak dapat dipulihkan kembali.',
+      variant: 'danger',
+      confirmText: 'Hapus Sesi',
+      cancelText: 'Batalkan'
+    });
+    if (ok) {
       await rundownService.deleteScheduleItem(id);
       setItems(prev => prev.filter(i => i.id !== id));
     }

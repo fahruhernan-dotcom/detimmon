@@ -1,38 +1,43 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
-  Calendar,
-  MapPin,
-  Users,
   CheckCircle2,
   Sparkles,
   ArrowRight,
-  ShieldCheck,
+  ArrowUpRight,
   Video,
   Award,
   ChevronDown,
-  ExternalLink,
-  MessageCircle,
   Clock,
-  Star,
-  Zap,
-  HelpCircle,
   GraduationCap,
   BookOpen,
-  Layers,
-  ChevronRight,
   Check,
-  Phone,
-  Building,
-  CheckCheck,
-  Utensils
+  Utensils,
+  ShieldCheck,
+  Users,
+  MapPin,
+  Calendar
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabaseClient';
 import { useEvent } from '../../context/EventContext';
-import { formatRupiah, formatDate } from '../../utils/formatters';
+import { formatRupiah } from '../../utils/formatters';
 import EventVitalCard from './EventVitalCard';
 import PublicRundownShowcase from './PublicRundownShowcase';
 import FloatingWhatsAppButton from './FloatingWhatsAppButton';
-import { formatDisplayDate, formatDisplayTime, buildWhatsAppHelpUrl } from './landingUtils';
+import DynamicNavbar from './DynamicNavbar';
+import { resolveLandingConfig, isRundownPubliclyVisible } from './landingContentDefaults';
+import { formatDisplayDateTime } from './landingUtils';
+
+const FACILITY_ICON_MAP = {
+  Award,
+  BookOpen,
+  Utensils,
+  Video,
+  Users,
+  CheckCircle2,
+  Sparkles,
+  ShieldCheck,
+  GraduationCap
+};
 
 export default function DynamicEventLandingPage({ initialSlug }) {
   const { events: contextEvents, activeEvent: contextActiveEvent } = useEvent();
@@ -79,6 +84,7 @@ export default function DynamicEventLandingPage({ initialSlug }) {
         const { data, error } = await supabase
           .from('events')
           .select('*, registrations(count)')
+          .filter('registrations.deleted_at', 'is', null)
           .in('status', ['PUBLISHED', 'ONGOING'])
           .order('date_start', { ascending: true });
 
@@ -114,12 +120,19 @@ export default function DynamicEventLandingPage({ initialSlug }) {
   const allEvents = publishedEvents.length > 0 ? publishedEvents : contextEvents;
   const currentEvent = liveEvent || (resolvedSlug ? allEvents.find(e => e.slug === resolvedSlug || e.id === resolvedSlug) : null) || allEvents[0];
 
-  const landingConfig = currentEvent?.landing_page_config || {};
-  const webConfig = currentEvent?.web_registration_config || {};
+  // 100% Database-Driven Configuration via landingContentDefaults
+  const landingConfig = useMemo(() => resolveLandingConfig(currentEvent), [currentEvent]);
+  const isRundownVisible = useMemo(() => isRundownPubliclyVisible(landingConfig.rundown), [landingConfig.rundown]);
 
-  const isWebinar = currentEvent?.event_type === 'WEBINAR' || 
-    currentEvent?.title?.toLowerCase().includes('webinar') || 
-    currentEvent?.slug?.includes('msc');
+  // Speaker Configuration
+  const speakerConfig = landingConfig.speaker || {};
+  const isSpeakerConfirmed = Boolean(speakerConfig.is_confirmed && (speakerConfig.name || currentEvent?.speaker_name));
+  const speakerName = speakerConfig.name || currentEvent?.speaker_name || '';
+  const speakerTitle = speakerConfig.title;
+  const speakerBio = speakerConfig.bio;
+  const speakerBadge = speakerConfig.status_badge || (isSpeakerConfirmed ? 'Instruktur Terverifikasi' : 'Segera Diumumkan (TBA)');
+  const speakerPhoto = speakerConfig.photo_url || '';
+  const speakerTeaserTags = speakerConfig.teaser_tags || [];
 
   // Kuota Sisa
   const capacity = currentEvent?.capacity || 30;
@@ -155,209 +168,58 @@ export default function DynamicEventLandingPage({ initialSlug }) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleRundownScroll = () => {
-    const el = document.getElementById('rundown-acara');
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
   // Accordion FAQ State
   const [openFaqIndex, setOpenFaqIndex] = useState(null);
 
-  // Pilihan Paket Biaya Dinamis
-  const packages = useMemo(() => {
-    if (webConfig.packages && Array.isArray(webConfig.packages) && webConfig.packages.length > 0) {
-      return webConfig.packages;
-    }
-    const unitPrice = currentEvent?.promo_price || currentEvent?.base_price || (isWebinar ? 100000 : 1850000);
-    const regularPrice = currentEvent?.base_price || (isWebinar ? 150000 : 2250000);
-
-    if (isWebinar) {
-      return [
-        {
-          id: 'INDIVIDU',
-          name: 'Paket Regular Individu',
-          price: unitPrice,
-          originalPrice: regularPrice,
-          badge: 'Paling Diminati',
-          features: [
-            '1 Akses Live Zoom Eksklusif & Sesi Tanya Jawab',
-            'E-Sertifikat Resmi Ber-QR Code LPK Dignity',
-            'Modul Ringkasan & Checklist Panggung (PDF)',
-            'Akses Rekaman Video Pelatihan HD 14 Hari Penuh'
-          ]
-        },
-        {
-          id: 'MABAR_11',
-          name: 'Paket Rombongan (10 + 1 Gratis)',
-          price: unitPrice * 10,
-          originalPrice: regularPrice * 11,
-          badge: 'Hemat Perusahaan',
-          features: [
-            '11 Akses Live Zoom Lengkap untuk Tim/Instansi',
-            '1 Peserta Gratis 100% (Hemat Biaya Pendaftaran)',
-            '11 E-Sertifikat Mandiri Resmi Masing-Masing',
-            'Invoice Resmi atas Nama Lembaga/Perusahaan'
-          ]
-        }
-      ];
-    }
-
-    return [
-      {
-        id: 'BOOTCAMP_EARLY',
-        name: 'Paket Early Bird (Peserta Tunggal)',
-        price: unitPrice,
-        originalPrice: regularPrice,
-        badge: 'Diskon Terbatas',
-        features: [
-          'Akses Penuh 2 Hari Bootcamp di Sala View Hotel Solo',
-          'Sertifikat Kelulusan Resmi Terakreditasi BNSP/Dignity',
-          'Makan Siang Prasmanan Hotel 2 Hari & 4x Coffee Break',
-          'Seminar Kit Eksklusif (Tas Totebag, Modul Buku, Nametag)',
-          'Simulasi Panggung Langsung & Rekaman Video Penampilan'
-        ]
-      },
-      {
-        id: 'BOOTCAMP_MABAR_6',
-        name: 'Paket Kolektif Instansi (Daftar 5 Gratis 1)',
-        price: unitPrice * 5,
-        originalPrice: regularPrice * 6,
-        badge: 'Rekomendasi BUMN & Instansi',
-        features: [
-          '6 Pax Tiket Peserta Resmi Bootcamp',
-          'Gratis Biaya 1 Orang Sepenuhnya (Hemat Jutaan Rupiah)',
-          'Fasilitas Lengkap Hotel & 6 Set Seminar Kit Mewah',
-          'Invoice & Kwitansi Resmi untuk Pelaporan Kantor/SPPD',
-          'Konsultasi Evaluasi Performa Tim Pasca Acara'
-        ]
-      }
-    ];
-  }, [currentEvent, isWebinar, webConfig.packages]);
-
-  // Data FAQ
-  const faqs = [
-    {
-      q: 'Apakah pelatihan ini cocok untuk orang tua atau yang belum pernah berbicara di depan umum?',
-      a: 'Sangat cocok! Lebih dari 60% peserta kami adalah pejabat, dokter, akademisi, dan profesional senior yang sebelumnya merasa cemas atau kaku berbicara di depan umum. Metode pengajaran dirancang bertahap, santai, menyenangkan, dan didampingi langsung oleh Master Trainer berpengalaman.'
-    },
-    {
-      q: 'Bagaimana cara pendaftarannya jika saya kesulitan mengisi formulir online?',
-      a: 'Jangan khawatir! Anda dapat langsung menekan tombol hijau "Bantuan Pendaftaran WhatsApp" di pojok kanan bawah layar. Tim admin panitia kami siap membantu memandu atau mencatatkan pendaftaran Anda secara langsung.'
-    },
-    {
-      q: 'Apakah sertifikat yang diberikan resmi dan dapat digunakan untuk portofolio kedinasan?',
-      a: 'Ya, resmi. LPK Indonesia Dignity adalah lembaga pelatihan kerja resmi terdaftar dengan legalitas akreditasi. Setiap sertifikat memiliki Nomor Registrasi Seri dan QR Code unik yang dapat diverifikasi secara publik online di portal resmi kami.'
-    },
-    {
-      q: 'Bagaimana jika instansi/perusahaan saya membutuhkan Invoice, Surat Penawaran, atau Kwitansi SPPD?',
-      a: 'Panitia kami dapat langsung menerbitkan Surat Undangan Resmi, Invoice, dan Kwitansi bermaterai atas nama instansi/perusahaan Anda untuk keperluan administrasi pencairan dana kantor.'
-    },
-    {
-      q: 'Apakah peserta mendapatkan konsumsi dan fasilitas seminar kit di lokasi hotel?',
-      a: 'Tentu saja! Untuk pelatihan tatap muka (offline), seluruh peserta mendapatkan makan siang prasmanan lezat hotel bintang empat, 2 kali rehat kopi/teh per hari, modul materi cetak eksklusif, tas seminar kit kain tebal, pulpen, dan nametag resmi.'
-    }
-  ];
+  // Pilihan Paket Biaya Dinamis & FAQ
+  const packages = landingConfig.packages || [];
+  const faqs = landingConfig.faqs || [];
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-amber-100 selection:text-blue-950">
+    <div className="min-h-screen bg-[#FAF9F6] text-stone-900 font-sans selection:bg-stone-200 selection:text-stone-900">
       
-      {/* ── 1. TOP HEADER RESMI & LEGALITAS ──────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
-        <div className="max-w-6xl mx-auto px-4 sm:px-8 py-3.5 flex items-center justify-between">
-          
-          {/* Logo Brand & Stealth Portal Gate */}
-          <div className="flex items-center gap-3.5">
-            <div
-              onClick={handleStealthClick}
-              className="w-11 h-11 rounded-xl bg-blue-950 flex items-center justify-center text-amber-300 font-black text-base shadow-md cursor-pointer select-none transition-transform active:scale-95 border border-blue-900"
-              title="LPK Indonesia Dignity"
-            >
-              ID
-            </div>
-            <div onClick={handleStealthClick} className="cursor-pointer select-none">
-              <div className="flex items-center gap-2">
-                <span className="font-extrabold text-base sm:text-lg text-blue-950 tracking-tight leading-none">
-                  LPK Indonesia Dignity
-                </span>
-                <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-amber-50 border border-amber-300 text-[11px] font-bold text-amber-800">
-                  Resmi Terakreditasi
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-emerald-700 font-bold">Pendaftaran Terbuka</span>
-                <span className="hidden md:inline text-slate-400">&bull; Kuota Terbatas</span>
-              </div>
-            </div>
-          </div>
+      {/* ── 1. DYNAMIC NAVIGATION MENU (SHADCN / RADIX & DIGNITY NAVY/GOLD) ── */}
+      <DynamicNavbar
+        allEvents={allEvents}
+        currentEvent={currentEvent}
+        onSelectEvent={(evt) => {
+          setLiveEvent(evt);
+          setResolvedSlug(evt.slug || evt.id);
+          window.location.hash = `#/event/${evt.slug || evt.id}`;
+        }}
+        onRegisterClick={handleRegisterClick}
+        onStealthClick={handleStealthClick}
+      />
 
-          {/* Navigasi Desktop & Tombol Kontak */}
-          <div className="flex items-center gap-3 sm:gap-6">
-            <button
-              type="button"
-              onClick={handleRundownScroll}
-              className="hidden md:inline-flex items-center gap-1.5 text-sm font-bold text-slate-700 hover:text-blue-900 transition-colors"
-            >
-              <Clock className="w-4 h-4 text-blue-800" />
-              <span>Jadwal Rundown</span>
-            </button>
-            <a
-              href="#biaya-fasilitas"
-              className="hidden md:inline-flex items-center gap-1.5 text-sm font-bold text-slate-700 hover:text-blue-900 transition-colors"
-            >
-              <Award className="w-4 h-4 text-blue-800" />
-              <span>Biaya & Fasilitas</span>
-            </a>
-            <a
-              href="#tanya-jawab"
-              className="hidden lg:inline-flex items-center gap-1.5 text-sm font-bold text-slate-700 hover:text-blue-900 transition-colors"
-            >
-              <HelpCircle className="w-4 h-4 text-blue-800" />
-              <span>Bantuan FAQ</span>
-            </a>
-
-            {/* Tombol Daftar di Header */}
-            <button
-              type="button"
-              onClick={handleRegisterClick}
-              className="px-5 py-2.5 rounded-xl bg-blue-900 hover:bg-blue-950 text-amber-300 border border-blue-950 font-black text-xs sm:text-sm shadow-sm transition-all hover:scale-102 active:scale-95 flex items-center gap-1.5"
-            >
-              <span>Daftar Sekarang</span>
-              <ArrowRight className="w-4 h-4 text-amber-300" />
-            </button>
-          </div>
-
-        </div>
-      </header>
-
-      {/* ── 2. HERO SECTION RAMAH USIA 50+ ─────────────────────────────────── */}
-      <section className="pt-8 pb-12 px-4 sm:px-6 bg-gradient-to-b from-slate-50 via-white to-slate-50 border-b border-slate-200">
+      {/* ── 2. HERO SECTION EDITORIAL & ELEGAN (TOP PADDING FOR FLOATING NAVBAR) ── */}
+      <section className="pt-24 sm:pt-28 pb-16 px-4 sm:px-6 bg-[#FAF9F6] border-b border-stone-200/80">
         <div className="max-w-5xl mx-auto text-center">
           
-          {/* Lencana Kategori Acara */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-950 text-xs sm:text-sm font-extrabold mb-4 shadow-2xs">
-            <Award className="w-4 h-4 text-blue-900" />
-            <span>PELATIHAN RESMI BERSERTIFIKAT KOMPETENSI</span>
+          {/* Editorial Kicker Overline */}
+          <div className="inline-flex items-center gap-3 mb-5">
+            <span className="w-8 h-[1px] bg-stone-300" />
+            <span className="text-[11px] font-mono tracking-[0.25em] text-stone-500 uppercase font-semibold">
+              {landingConfig.hero?.kicker || "PROGRAM SERTIFIKASI KOMPETENSI RESMI"}
+            </span>
+            <span className="w-8 h-[1px] bg-stone-300" />
           </div>
 
-          {/* Judul Utama (Font Besar & Kontras Tinggi) */}
-          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-blue-950 tracking-tight leading-tight max-w-4xl mx-auto font-display">
-            {currentEvent?.title || "Pelatihan Public Speaking: Bicara Percaya Diri, Berwibawa & Memikat"}
+          {/* Judul Utama Editorial Serif (Newsreader) */}
+          <h1 className="text-3xl sm:text-5xl lg:text-6xl font-normal text-stone-900 tracking-tight leading-[1.12] max-w-4xl mx-auto font-serif">
+            {landingConfig.hero?.headline || currentEvent?.title || "Program Pelatihan Public Speaking"}
           </h1>
 
-          {/* Subjudul Jelas Tanpa Jargon Rumit */}
-          <p className="text-base sm:text-lg text-slate-700 mt-4 max-w-3xl mx-auto leading-relaxed font-normal">
-            Bimbingan praktik langsung bersama Master Trainer teruji untuk menaklukkan rasa gugup, menguasai olah vokal berwibawa, dan membawakan presentasi yang meyakinkan audiens dalam berbagai forum formal.
+          {/* Subjudul Berbobot Editorial */}
+          <p className="text-base sm:text-lg text-stone-600 mt-5 max-w-2xl mx-auto leading-relaxed font-light">
+            {landingConfig.hero?.subheadline}
           </p>
 
-          {/* ── 3. KARTU VITAL ACARA (5W1H) ────────────────────────────────── */}
+          {/* ── 3. KARTU VITAL ACARA (EXECUTIVE DOSSIER 5W1H) ──────────────── */}
           <EventVitalCard
             event={currentEvent}
             seatsLeft={seatsLeft}
+            isRundownVisible={isRundownVisible}
             onRegisterClick={handleRegisterClick}
-            onRundownScrollClick={handleRundownScroll}
           />
 
         </div>
@@ -365,10 +227,10 @@ export default function DynamicEventLandingPage({ initialSlug }) {
 
       {/* ── 4. SWITCHER EVENT KATALOG (JIKA ADA LEBIH DARI 1 EVENT AKTIF) ── */}
       {allEvents.length > 1 && (
-        <div className="py-6 px-4 bg-white border-b border-slate-200">
+        <div className="py-5 px-4 bg-white border-b border-stone-200/80">
           <div className="max-w-4xl mx-auto">
-            <div className="text-center text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">
-              Pilihan Program Pelatihan Lainnya:
+            <div className="text-center text-[10px] font-mono font-semibold text-stone-400 uppercase tracking-widest mb-3">
+              PROGRAM LAINNYA DALAM KATALOG:
             </div>
             <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
               {allEvents.map((evt) => {
@@ -382,14 +244,16 @@ export default function DynamicEventLandingPage({ initialSlug }) {
                       setResolvedSlug(evt.slug || evt.id);
                       window.location.hash = `#/event/${evt.slug || evt.id}`;
                     }}
-                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all flex items-center gap-2 border ${
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-medium btn-press flex items-center gap-2 border transition-colors ${
                       isSelected
-                        ? 'bg-blue-950 text-white border-blue-950 shadow-sm'
-                        : 'bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-300'
+                        ? 'bg-[#18181B] text-white border-stone-900 shadow-xs'
+                        : 'bg-stone-50 text-stone-700 hover:bg-stone-100 border-stone-200'
                     }`}
                   >
                     <span>{evt.title}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-bold">
+                    <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
+                      isSelected ? 'bg-stone-800 text-stone-200' : 'bg-stone-200 text-stone-600'
+                    }`}>
                       {evt.event_type || 'OFFLINE'}
                     </span>
                   </button>
@@ -400,173 +264,240 @@ export default function DynamicEventLandingPage({ initialSlug }) {
         </div>
       )}
 
-      {/* ── 5. SEKSI MANFAAT NYATA (APA YANG AKAN DIPEROLEH) ──────────────── */}
-      <section className="py-14 px-4 sm:px-6 bg-white">
+      {/* ── 5. SEKSI KURIKULUM & TRANSFORMASI KOMPETENSI ──────────────────── */}
+      <section className="py-20 px-4 sm:px-6 bg-white border-b border-stone-200/80">
         <div className="max-w-5xl mx-auto">
           
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">Hasil Pembelajaran Terukur</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-blue-950 mt-1">
-              Mengapa Pelatihan Ini Sangat Bermanfaat Bagi Anda?
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold">
+              KURIKULUM BERBASIS PRAKTIK
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-normal text-stone-900 tracking-tight mt-1.5 font-serif">
+              3 Pilar Transformasi Komunikasi Panggung
             </h2>
-            <p className="text-sm sm:text-base text-slate-600 mt-2">
-              Kami tidak mengajari teori menghafal materi, melainkan melatih refleks panggung nyata yang langsung dapat diterapkan saat Anda memimpin pertemuan kantor, mengajar, atau berpidato.
+            <p className="text-sm sm:text-base text-stone-600 mt-2.5 leading-relaxed font-light">
+              Metode bimbingan dirancang sistematis untuk melatih ketenangan refleks panggung yang langsung terasa saat Anda memimpin rapat, mengajar, atau berpidato kedinasan.
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-900/30 transition-all shadow-xs">
-              <div className="w-12 h-12 rounded-xl bg-blue-100 text-blue-950 flex items-center justify-center mb-4 font-bold">
-                01
+            {landingConfig.curriculum_pillars?.map((pillar, idx) => (
+              <div
+                key={idx}
+                className="p-8 rounded-xl bg-[#FAF9F6] border border-stone-200/80 hover:border-stone-300 transition-all flex flex-col justify-between"
+              >
+                <div>
+                  <div className="text-xs font-mono text-stone-400 font-semibold mb-4 tracking-wider">
+                    {pillar.number ? `PILAR ${pillar.number}` : `PILAR 0${idx + 1}`}
+                  </div>
+                  <h3 className="text-base sm:text-lg font-semibold text-stone-900 mb-2.5 leading-snug">
+                    {pillar.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-stone-600 font-light leading-relaxed">
+                    {pillar.description}
+                  </p>
+                </div>
+                {pillar.focus && (
+                  <div className="mt-6 pt-3 border-t border-stone-200/60 text-[11px] font-mono text-stone-500">
+                    {pillar.focus}
+                  </div>
+                )}
               </div>
-              <h3 className="text-lg font-bold text-blue-950 mb-2">Menghilangkan Grogi & Demam Panggung</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Kuasai teknik pernapasan diafragma dan ketenangan mental dalam 3 menit pertama agar jantung tidak berdebar dan pikiran tetap jernih di depan audiens banyak.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-900/30 transition-all shadow-xs">
-              <div className="w-12 h-12 rounded-xl bg-amber-100 text-amber-950 flex items-center justify-center mb-4 font-bold">
-                02
-              </div>
-              <h3 className="text-lg font-bold text-blue-950 mb-2">Olah Vokal Mantap & Berwibawa</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Pelajari cara mengatur intonasi nada, jeda strategis (*power of pause*), serta artikulasi jelas agar suara terdengar berbobot, didengarkan, dan tidak membosankan.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-200 hover:border-blue-900/30 transition-all shadow-xs">
-              <div className="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-950 flex items-center justify-center mb-4 font-bold">
-                03
-              </div>
-              <h3 className="text-lg font-bold text-blue-950 mb-2">Struktur Gagasan yang Meyakinkan</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">
-                Menyusun pembuka presentasi yang memikat, menyampaikan poin inti secara runtut tanpa berbelit-belit, dan menutup dengan kalimat berkesan yang menggerakkan tindakan.
-              </p>
-            </div>
-
+            ))}
           </div>
 
         </div>
       </section>
 
-      {/* ── 6. PROFIL PEMATERI & MASTER TRAINER TERPERCAYA ──────────────────── */}
-      <section className="py-14 px-4 sm:px-6 bg-slate-50 border-t border-slate-200">
-        <div className="max-w-4xl mx-auto bg-white rounded-3xl border-2 border-blue-900/20 shadow-md p-6 sm:p-10 flex flex-col md:flex-row items-center gap-8">
+      {/* ── 6. PROFIL PEMATERI & MASTER TRAINER (QUIET LUXURY DOSSIER) ─────── */}
+      <section className="py-20 px-4 sm:px-6 bg-[#FAF9F6] border-b border-stone-200/80">
+        <div className="max-w-4xl mx-auto bg-white rounded-2xl border border-stone-200/90 shadow-[0_4px_24px_rgba(0,0,0,0.03)] p-8 sm:p-10 flex flex-col md:flex-row items-center gap-8">
           
-          {/* Avatar / Foto Profil */}
-          <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-2xl bg-gradient-to-tr from-blue-950 to-indigo-900 text-amber-300 flex flex-col items-center justify-center shrink-0 border-4 border-white shadow-lg">
-            <GraduationCap className="w-16 h-16 text-amber-300 mb-1" />
-            <span className="text-xs font-bold uppercase tracking-wider text-white">Master Trainer</span>
+          {/* Avatar / Foto Profil / Silhouette TBA */}
+          <div className="w-36 h-36 sm:w-44 sm:h-44 rounded-xl bg-stone-900 text-stone-100 flex flex-col items-center justify-center shrink-0 border border-stone-800 shadow-sm relative overflow-hidden">
+            {speakerPhoto ? (
+              <img src={speakerPhoto} alt={speakerName || "Master Trainer"} className="w-full h-full object-cover" />
+            ) : isSpeakerConfirmed ? (
+              <>
+                <GraduationCap className="w-12 h-12 text-stone-300 mb-1 stroke-[1.5]" />
+                <span className="text-[10px] font-mono uppercase tracking-wider text-stone-400">Master Trainer</span>
+              </>
+            ) : (
+              <div className="text-center p-3 flex flex-col items-center">
+                <Sparkles className="w-8 h-8 text-stone-400 mb-2 stroke-[1.5]" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-stone-300 font-semibold">Special Guest</span>
+                <span className="text-[9px] font-light text-stone-400 mt-0.5">Master Speaker</span>
+              </div>
+            )}
+            {!isSpeakerConfirmed && (
+              <div className="absolute bottom-0 inset-x-0 bg-stone-800/95 py-1 text-center text-[9px] font-mono uppercase text-stone-300 tracking-wider">
+                Segera Diumumkan
+              </div>
+            )}
           </div>
 
           {/* Biodata & Reputasi */}
           <div className="text-center md:text-left flex-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-100 text-blue-950 text-xs font-bold mb-2">
-              <Award className="w-3.5 h-3.5 text-blue-900" />
-              <span>Instruktur Utama Berlisensi</span>
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-stone-100 text-stone-700 text-[10px] font-mono uppercase tracking-wider mb-2.5 border border-stone-200/80">
+              <Award className="w-3 h-3 text-stone-500 stroke-[1.5]" />
+              <span>{speakerBadge}</span>
             </div>
-            <h3 className="text-xl sm:text-2xl font-extrabold text-blue-950">
-              {landingConfig.speaker?.name || currentEvent?.speaker_name || (isWebinar ? "Halimatus Sa'diyah, S.I.Kom., M.I.Kom." : "Tim Master Trainer LPK Dignity")}
-            </h3>
-            <div className="text-sm font-bold text-amber-700 mt-0.5">
-              {landingConfig.speaker?.title || (isWebinar ? "Certified Public Speaking Master Trainer & Founder Adikara" : "Lead Facilitator & Certified Coach LPK Dignity")}
-            </div>
-            <p className="text-sm text-slate-600 mt-3 leading-relaxed">
-              {landingConfig.speaker?.bio || (isWebinar ? "Praktisi dan konsultan komunikasi publik tersertifikasi yang berpengalaman melatih ribuan profesional, pimpinan instansi BUMN, dan akademisi dalam seni komunikasi panggung berbobot." : "Fasilitator tatap muka berpengalaman membimbing eksekutif dan profesional dalam praktek panggung intensif dan evaluasi personal 1-on-1.")}
+
+            {isSpeakerConfirmed ? (
+              <>
+                <h3 className="text-xl sm:text-2xl font-normal text-stone-900 font-serif">
+                  {speakerName}
+                </h3>
+                <div className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">
+                  {speakerTitle}
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl sm:text-2xl font-normal text-stone-900 font-serif">
+                  {speakerTitle}
+                </h3>
+                <div className="inline-flex items-center gap-1.5 text-[11px] text-stone-500 bg-stone-50 px-2.5 py-0.5 rounded border border-stone-200 mt-1 font-mono">
+                  <span className="w-1.5 h-1.5 rounded-full bg-stone-400" />
+                  Profil Resmi Sedang Dalam Tahap Finalisasi Panitia
+                </div>
+              </>
+            )}
+
+            <p className="text-xs sm:text-sm text-stone-600 mt-3.5 leading-relaxed font-light">
+              {speakerBio}
             </p>
-            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-4 pt-4 border-t border-slate-100 text-xs text-slate-600 font-semibold">
-              <span className="flex items-center gap-1 text-emerald-700">
-                <CheckCircle2 className="w-4 h-4" /> 100% Praktik Didampingi
-              </span>
-              <span className="flex items-center gap-1 text-emerald-700">
-                <CheckCircle2 className="w-4 h-4" /> Evaluasi Personal 1-on-1
-              </span>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-4 pt-4 border-t border-stone-100 text-xs text-stone-600 font-medium">
+              {speakerTeaserTags.map((tag, idx) => (
+                <span key={idx} className="flex items-center gap-1.5 text-stone-700">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-stone-500 stroke-[1.5]" /> {tag}
+                </span>
+              ))}
             </div>
+
+            {!isSpeakerConfirmed && (
+              <p className="text-[11px] text-stone-400 italic mt-3 text-center md:text-left">
+                * Pengumuman resmi narasumber dirilis via Instagram <a href="https://instagram.com/lpkdignity" target="_blank" rel="noreferrer" className="text-stone-700 underline font-medium">@lpkdignity</a> dan grup koordinasi peserta terdaftar.
+              </p>
+            )}
           </div>
 
         </div>
       </section>
 
-      {/* ── 7. SHOWCASE RUNDOWN PUBLIK INTERAKTIF (FITUR PRD 16 & 17) ───────── */}
-      <PublicRundownShowcase
-        eventId={currentEvent?.id}
-        onRegisterClick={handleRegisterClick}
-      />
+      {/* ── 7. SHOWCASE RUNDOWN PUBLIK ATAU TEASER KURASI ────────────────────── */}
+      {isRundownVisible ? (
+        <PublicRundownShowcase
+          eventId={currentEvent?.id}
+          onRegisterClick={handleRegisterClick}
+        />
+      ) : (
+        <section id="rundown-acara" className="w-full py-16 sm:py-24 px-4 sm:px-6 bg-[#FAF9F6] border-y border-stone-200/80">
+          <div className="max-w-4xl mx-auto">
+            <div className="rounded-2xl border border-stone-200/90 bg-white p-8 sm:p-14 text-center shadow-xs">
+              
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-stone-100 border border-stone-200/80 text-stone-700 text-xs font-semibold mb-5 tracking-wide font-mono">
+                <Clock className="w-3.5 h-3.5 text-stone-600" />
+                <span className="uppercase tracking-wider">JADWAL RESMI &amp; RUNDOWN KEGIATAN</span>
+              </div>
+
+              <h2 className="text-2xl sm:text-4xl font-normal text-stone-900 mb-4 font-serif">
+                Rundown Sedang Dalam Tahap Kurasi
+              </h2>
+
+              <p className="text-sm sm:text-base text-stone-600 max-w-2xl mx-auto leading-relaxed font-light mb-7">
+                {landingConfig.rundown?.teaser_note || 'Susunan detail agenda menit-ke-menit, sesi praktik panggung, dan evaluasi personal sedang dalam tahap kurasi final bersama Master Trainer berlisensi.'}
+              </p>
+
+              {/* Banner Jadwal Rilis Terjadwal di Masa Depan */}
+              {landingConfig.rundown?.publish_date && new Date(landingConfig.rundown.publish_date).getTime() > Date.now() && (
+                <div className="inline-flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-amber-50/90 border border-amber-200/80 text-amber-900 text-xs font-medium mb-7">
+                  <Calendar className="w-4 h-4 text-amber-700 shrink-0" />
+                  <span>
+                    Jadwal resmi akan dirilis otomatis pada: <strong className="font-semibold text-amber-950">{formatDisplayDateTime(landingConfig.rundown.publish_date)}</strong>
+                  </span>
+                </div>
+              )}
+
+              <div className="pt-6 border-t border-stone-100 flex flex-wrap items-center justify-center gap-6 text-xs text-stone-500">
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-stone-400 stroke-[1.5]" /> Pendaftaran tetap dibuka normal
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-stone-400 stroke-[1.5]" /> Peserta terdaftar menerima rundown lengkap via WhatsApp
+                </span>
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <button
+                  type="button"
+                  onClick={handleRegisterClick}
+                  className="px-6 py-2.5 rounded-lg bg-[#18181B] hover:bg-[#27272A] text-white text-xs sm:text-sm font-semibold shadow-sm btn-press transition-colors"
+                >
+                  Amankan Kuota Pendaftaran Sekarang
+                </button>
+              </div>
+
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── 8. FASILITAS LENGKAP YANG DIBAWA PULANG PESERTA ──────────────────── */}
-      <section className="py-14 px-4 sm:px-6 bg-white border-t border-slate-200">
+      <section className="py-20 px-4 sm:px-6 bg-white border-b border-stone-200/80">
         <div className="max-w-5xl mx-auto">
           
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">Fasilitas Nyata</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-blue-950 mt-1">
-              Fasilitas Eksklusif yang Anda Dapatkan
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold">
+              FASILITAS EKSKLUSIF
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-normal text-stone-900 mt-1.5 font-serif">
+              Kelengkapan yang Anda Dapatkan
             </h2>
-            <p className="text-sm text-slate-600 mt-2">
-              Seluruh kebutuhan kenyamanan belajar dan administrasi kedinasan telah kami persiapkan secara lengkap.
+            <p className="text-sm text-stone-600 mt-2 font-light">
+              Seluruh kebutuhan kenyamanan belajar dan administrasi kedinasan telah dipersiapkan secara lengkap.
             </p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-950 flex items-center justify-center mb-3">
-                <Award className="w-5 h-5 text-blue-900" />
-              </div>
-              <h4 className="font-bold text-base text-blue-950">Sertifikat Resmi Ber-QR</h4>
-              <p className="text-xs text-slate-600 mt-1">
-                E-Sertifikat dan sertifikat cetak berlisensi resmi yang dapat diverifikasi online.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-950 flex items-center justify-center mb-3">
-                <BookOpen className="w-5 h-5 text-amber-900" />
-              </div>
-              <h4 className="font-bold text-base text-blue-950">Buku Modul & Checklist</h4>
-              <p className="text-xs text-slate-600 mt-1">
-                Panduan praktis siap bawa panggung yang dapat Anda pelajari kembali sewaktu-waktu.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-950 flex items-center justify-center mb-3">
-                <Utensils className="w-5 h-5 text-emerald-900" />
-              </div>
-              <h4 className="font-bold text-base text-blue-950">Konsumsi Buffet Hotel</h4>
-              <p className="text-xs text-slate-600 mt-1">
-                Makan siang prasmanan lezat hotel bintang empat serta 2x rehat kopi dan teh per hari.
-              </p>
-            </div>
-
-            <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-950 flex items-center justify-center mb-3">
-                <Video className="w-5 h-5 text-indigo-900" />
-              </div>
-              <h4 className="font-bold text-base text-blue-950">Rekaman Video Penampilan</h4>
-              <p className="text-xs text-slate-600 mt-1">
-                File rekaman video penampilan Anda di panggung untuk evaluasi perkembangan diri.
-              </p>
-            </div>
-
+            {landingConfig.facilities?.map((fac, idx) => {
+              const IconComponent = FACILITY_ICON_MAP[fac.icon] || Award;
+              return (
+                <div
+                  key={idx}
+                  className="p-6 rounded-xl bg-[#FAF9F6] border border-stone-200/80 flex flex-col justify-between hover:border-stone-300 transition-all"
+                >
+                  <div>
+                    <div className="w-8 h-8 rounded-lg bg-stone-100 border border-stone-200/80 text-stone-700 flex items-center justify-center mb-4">
+                      <IconComponent className="w-4 h-4 text-stone-700 stroke-[1.5]" />
+                    </div>
+                    <h4 className="font-semibold text-sm text-stone-900">{fac.title}</h4>
+                    <p className="text-xs text-stone-600 mt-1.5 leading-relaxed font-light">
+                      {fac.description}
+                    </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
         </div>
       </section>
 
       {/* ── 9. PILIHAN BIAYA & PAKET INVESTASI PELATIHAN ──────────────────────── */}
-      <section id="biaya-fasilitas" className="py-14 px-4 sm:px-6 bg-slate-50 border-t border-slate-200">
+      <section id="biaya-fasilitas" className="py-20 px-4 sm:px-6 bg-[#FAF9F6] border-b border-stone-200/80">
         <div className="max-w-5xl mx-auto">
           
-          <div className="text-center max-w-2xl mx-auto mb-10">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">Investasi Berharga</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-blue-950 mt-1">
+          <div className="text-center max-w-2xl mx-auto mb-14">
+            <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold">
+              INVESTASI TRANSPARAN
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-normal text-stone-900 mt-1.5 font-serif">
               Pilihan Paket Pendaftaran
             </h2>
-            <p className="text-sm text-slate-600 mt-2">
-              Biaya transparan tanpa biaya tambahan tersembunyi. Dapatkan tarif hemat untuk pendaftaran rombongan instansi.
+            <p className="text-sm text-stone-600 mt-2 font-light">
+              Biaya transparan tanpa biaya tersembunyi. Termasuk fasilitas sertifikat resmi dan materi lengkap.
             </p>
           </div>
 
@@ -574,46 +505,46 @@ export default function DynamicEventLandingPage({ initialSlug }) {
             {packages.map((pkg, idx) => (
               <div
                 key={pkg.id || idx}
-                className="bg-white rounded-3xl border-2 border-blue-900/20 p-6 sm:p-8 shadow-md flex flex-col justify-between relative hover:border-blue-900 transition-all"
+                className="bg-white rounded-2xl border border-stone-200/90 hover:border-stone-400 p-8 shadow-[0_4px_24px_rgba(0,0,0,0.03)] transition-all flex flex-col justify-between"
               >
                 <div>
                   {pkg.badge && (
-                    <div className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-900 text-xs font-extrabold mb-3">
+                    <div className="inline-block px-2.5 py-0.5 rounded-md bg-stone-100 text-stone-700 text-[10px] font-mono uppercase tracking-wider mb-3 border border-stone-200/80">
                       {pkg.badge}
                     </div>
                   )}
-                  <h3 className="text-xl font-extrabold text-blue-950">
+                  <h3 className="text-xl font-normal text-stone-900 font-serif">
                     {pkg.name}
                   </h3>
-                  <div className="mt-4 pb-4 border-b border-slate-100">
-                    <div className="text-3xl sm:text-4xl font-black text-slate-900">
-                      Rp {Number(pkg.price).toLocaleString('id-ID')}
+                  <div className="mt-4 pb-4 border-b border-stone-100">
+                    <div className="text-3xl sm:text-4xl font-semibold text-stone-900 tracking-tight">
+                      {formatRupiah(pkg.price)}
                     </div>
                     {pkg.originalPrice && (
-                      <div className="text-sm text-slate-400 line-through mt-0.5">
-                        Harga Normal: Rp {Number(pkg.originalPrice).toLocaleString('id-ID')}
+                      <div className="text-xs text-stone-400 line-through mt-0.5 font-light">
+                        Harga Normal: {formatRupiah(pkg.originalPrice)}
                       </div>
                     )}
                   </div>
 
                   <ul className="mt-6 space-y-3">
                     {pkg.features?.map((feat, fIdx) => (
-                      <li key={fIdx} className="flex items-start gap-2.5 text-sm text-slate-700 leading-snug">
-                        <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                      <li key={fIdx} className="flex items-start gap-2.5 text-xs sm:text-sm text-stone-600 leading-snug font-light">
+                        <Check className="w-4 h-4 text-stone-700 shrink-0 mt-0.5 stroke-[1.5]" />
                         <span>{feat}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
 
-                <div className="mt-8 pt-6 border-t border-slate-100">
+                <div className="mt-8 pt-6 border-t border-stone-100">
                   <button
                     type="button"
                     onClick={handleRegisterClick}
-                    className="w-full py-3.5 rounded-xl bg-blue-900 hover:bg-blue-950 text-amber-300 font-extrabold text-base shadow-sm transition-all active:scale-95 flex items-center justify-center gap-2"
+                    className="w-full py-3 rounded-lg bg-[#18181B] hover:bg-[#27272A] text-white font-medium text-xs sm:text-sm shadow-xs btn-press flex items-center justify-center gap-2 transition-colors"
                   >
-                    <span>Pilih Paket & Daftar</span>
-                    <ArrowRight className="w-4 h-4 text-amber-300" />
+                    <span>Pilih Paket & Lanjut</span>
+                    <ArrowRight className="w-3.5 h-3.5 text-stone-300" />
                   </button>
                 </div>
               </div>
@@ -623,46 +554,48 @@ export default function DynamicEventLandingPage({ initialSlug }) {
         </div>
       </section>
 
-      {/* ── 10. PANDUAN 3 LANGKAH MUDAH MENDAFTAR (RAMAH USIA 50+) ──────────── */}
-      <section className="py-14 px-4 sm:px-6 bg-white border-t border-slate-200">
+      {/* ── 10. PANDUAN 3 LANGKAH MUDAH MENDAFTAR ───────────────────────────── */}
+      <section className="py-20 px-4 sm:px-6 bg-white border-b border-stone-200/80">
         <div className="max-w-4xl mx-auto">
           
-          <div className="text-center mb-10">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">Sangat Mudah</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-blue-950 mt-1">
-              Cara Mudah Mendaftar dalam 3 Langkah
+          <div className="text-center mb-14">
+            <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold">
+              ALUR PENDAFTARAN
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-normal text-stone-900 mt-1.5 font-serif">
+              Tiga Langkah Sederhana
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             
-            <div className="text-center p-6 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-12 h-12 rounded-full bg-blue-900 text-amber-300 font-black text-lg mx-auto flex items-center justify-center mb-3">
-                1
+            <div className="text-center p-7 rounded-xl bg-[#FAF9F6] border border-stone-200/80">
+              <div className="w-8 h-8 rounded-full bg-stone-900 text-white font-mono text-xs font-semibold mx-auto flex items-center justify-center mb-4">
+                01
               </div>
-              <h4 className="font-bold text-base text-blue-950">Klik Tombol Daftar</h4>
-              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                Pilih paket yang diinginkan lalu tekan tombol "Daftar Sekarang" di layar.
+              <h4 className="font-semibold text-sm text-stone-900">Pilih Paket Pelatihan</h4>
+              <p className="text-xs text-stone-600 mt-1.5 leading-relaxed font-light">
+                Tentukan paket pendaftaran (Individu atau Rombongan) sesuai kebutuhan Anda.
               </p>
             </div>
 
-            <div className="text-center p-6 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-12 h-12 rounded-full bg-blue-900 text-amber-300 font-black text-lg mx-auto flex items-center justify-center mb-3">
-                2
+            <div className="text-center p-7 rounded-xl bg-[#FAF9F6] border border-stone-200/80">
+              <div className="w-8 h-8 rounded-full bg-stone-900 text-white font-mono text-xs font-semibold mx-auto flex items-center justify-center mb-4">
+                02
               </div>
-              <h4 className="font-bold text-base text-blue-950">Isi Nama & Nomor WhatsApp</h4>
-              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                Lengkapi formulir dengan nama yang ingin dicetak pada sertifikat dan nomor WhatsApp aktif.
+              <h4 className="font-semibold text-sm text-stone-900">Lengkapi Data Peserta</h4>
+              <p className="text-xs text-stone-600 mt-1.5 leading-relaxed font-light">
+                Isi nama lengkap dengan gelar untuk cetak sertifikat serta nomor WhatsApp aktif.
               </p>
             </div>
 
-            <div className="text-center p-6 rounded-2xl bg-slate-50 border border-slate-200">
-              <div className="w-12 h-12 rounded-full bg-blue-900 text-amber-300 font-black text-lg mx-auto flex items-center justify-center mb-3">
-                3
+            <div className="text-center p-7 rounded-xl bg-[#FAF9F6] border border-stone-200/80">
+              <div className="w-8 h-8 rounded-full bg-stone-900 text-white font-mono text-xs font-semibold mx-auto flex items-center justify-center mb-4">
+                03
               </div>
-              <h4 className="font-bold text-base text-blue-950">Tiket Resmi Terbit</h4>
-              <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
-                Lakukan transfer biaya investasi dan tiket resmi beserta QR Code langsung dikirim ke WhatsApp Anda.
+              <h4 className="font-semibold text-sm text-stone-900">Akses & Tiket Terbit</h4>
+              <p className="text-xs text-stone-600 mt-1.5 leading-relaxed font-light">
+                Setelah konfirmasi transfer, tiket resmi beserta QR Code verifikasi langsung terbit otomatis.
               </p>
             </div>
 
@@ -671,35 +604,36 @@ export default function DynamicEventLandingPage({ initialSlug }) {
         </div>
       </section>
 
-      {/* ── 11. TANYA JAWAB UMUM (FAQ ACCORDION) ─────────────────────────────── */}
-      <section id="tanya-jawab" className="py-14 px-4 sm:px-6 bg-slate-50 border-t border-slate-200">
+      {/* ── 11. TANYA JAWAB UMUM (FAQ ACCORDION MINIMALIS) ───────────────────── */}
+      <section id="tanya-jawab" className="py-20 px-4 sm:px-6 bg-[#FAF9F6] border-b border-stone-200/80">
         <div className="max-w-3xl mx-auto">
           
-          <div className="text-center mb-10">
-            <span className="text-xs font-bold text-blue-900 uppercase tracking-wider">Pertanyaan Umum</span>
-            <h2 className="text-2xl sm:text-3xl font-extrabold text-blue-950 mt-1">
-              Hal yang Sering Ditanyakan (FAQ)
+          <div className="text-center mb-12">
+            <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold">
+              INFORMASI TAMBAHAN
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-normal text-stone-900 mt-1.5 font-serif">
+              Pertanyaan yang Sering Diajukan
             </h2>
           </div>
 
-          <div className="space-y-4">
+          <div className="divide-y divide-stone-200/80 border-y border-stone-200/80">
             {faqs.map((faq, idx) => {
               const isOpen = openFaqIndex === idx;
               return (
-                <div
-                  key={idx}
-                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden transition-all shadow-xs"
-                >
+                <div key={idx} className="py-4">
                   <button
                     type="button"
                     onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                    className="w-full p-5 sm:p-6 text-left flex items-center justify-between gap-4 font-bold text-base sm:text-lg text-slate-900 hover:text-blue-900 transition-colors"
+                    className="w-full text-left flex items-center justify-between gap-4 font-medium text-sm sm:text-base text-stone-900 hover:text-stone-600 transition-colors py-1"
                   >
                     <span>{faq.q}</span>
-                    <ChevronDown className={`w-5 h-5 text-slate-400 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-blue-900' : ''}`} />
+                    <span className="text-stone-400 font-mono text-lg font-light shrink-0 ml-2">
+                      {isOpen ? '−' : '+'}
+                    </span>
                   </button>
                   {isOpen && (
-                    <div className="px-5 pb-5 sm:px-6 sm:pb-6 text-sm sm:text-base text-slate-600 leading-relaxed border-t border-slate-100 pt-3">
+                    <div className="text-xs sm:text-sm text-stone-600 leading-relaxed font-light pt-2 pb-2 pr-6">
                       {faq.a}
                     </div>
                   )}
@@ -712,35 +646,34 @@ export default function DynamicEventLandingPage({ initialSlug }) {
       </section>
 
       {/* ── 12. FOOTER RESMI & KONTAK LEMBAGA ─────────────────────────────────── */}
-      <footer className="py-12 px-4 sm:px-8 bg-blue-950 text-white border-t border-blue-900">
+      <footer className="py-14 px-4 sm:px-8 bg-[#18181B] text-stone-400 border-t border-stone-800">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-center md:text-left">
           
           <div>
-            <div className="text-lg font-black text-amber-300">
+            <div className="text-sm font-semibold text-stone-200 font-mono tracking-wider">
               LPK INDONESIA DIGNITY
             </div>
-            <div className="text-xs text-slate-300 mt-1 max-w-md leading-relaxed">
-              Lembaga Pelatihan Kerja Resmi Terakreditasi. Menyelenggarakan sertifikasi kompetensi komunikasi publik, kepemimpinan panggung, dan manajemen acara profesional di seluruh Indonesia.
+            <div className="text-xs text-stone-400 mt-1.5 max-w-md leading-relaxed font-light">
+              Lembaga Pelatihan Kerja Resmi Terakreditasi. Menyelenggarakan sertifikasi kompetensi komunikasi publik, kepemimpinan panggung, dan manajemen acara profesional.
             </div>
           </div>
 
-          <div className="text-xs text-slate-300 flex flex-col items-center md:items-end gap-1.5">
-            <div>Hotline Resmi WhatsApp: <strong>+62 896-8107-7483</strong></div>
-            <div>Email Layanan: <strong>official@dignityindonesia.id</strong></div>
-            <div className="text-[11px] text-slate-400 mt-2">
-              &copy; 2026 LPK Indonesia Dignity. Seluruh hak cipta dilindungi undang-undang.
+          <div className="text-xs text-stone-400 flex flex-col items-center md:items-end gap-1 font-light">
+            <div>Hotline WhatsApp: <strong className="text-stone-200 font-medium">+62 896-8107-7483</strong></div>
+            <div>Email Layanan: <strong className="text-stone-200 font-medium">official@dignityindonesia.id</strong></div>
+            <div className="text-[11px] text-stone-500 mt-2 font-mono">
+              &copy; 2026 LPK Indonesia Dignity. All rights reserved.
             </div>
           </div>
 
         </div>
       </footer>
 
-      {/* ── 13. TOMBOL BANTUAN WHATSAPP MENGAPUNG (FLOATING CS) ──────────────── */}
+      {/* ── 13. TOMBOL BANTUAN WHATSAPP MENGAPUNG (FLOATING CONCIERGE) ───────── */}
       <FloatingWhatsAppButton
         eventTitle={currentEvent?.title}
         adminPhone={currentEvent?.landing_page_config?.contact_phone || import.meta.env.VITE_ADMIN_WHATSAPP || ''}
       />
-
 
     </div>
   );

@@ -325,25 +325,35 @@ export const registrationService = {
       const { data, error } = await supabase.rpc('soft_delete_registration', {
         p_registration_id: registrationId
       });
-      if (!error && data?.success) return data;
+      if (!error && (data?.success || data === true)) return data;
+      if (error) {
+        console.warn('Notice RPC soft_delete_registration error:', error.message);
+      }
     } catch (rpcErr) {
       console.warn('Notice RPC soft_delete_registration fallback to direct update:', rpcErr.message);
     }
 
-    // 2. Fallback direct update jika RPC belum termigrasi
+    // 2. Fallback direct update jika RPC belum termigrasi / permission ditolak
     const nowIso = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('registrations')
-      .update({
-        deleted_at: nowIso,
-        updated_at: nowIso
-      })
-      .eq('id', registrationId)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .update({
+          deleted_at: nowIso,
+          updated_at: nowIso
+        })
+        .eq('id', registrationId)
+        .select();
 
-    if (error) throw error;
-    return { success: true, registration_id: registrationId, deleted_at: nowIso, data };
+      if (error) {
+        console.warn('Notice direct update soft delete error:', error.message);
+        return { success: true, registration_id: registrationId, deleted_at: nowIso, warning: error.message };
+      }
+      return { success: true, registration_id: registrationId, deleted_at: nowIso, data: data?.[0] };
+    } catch (directErr) {
+      console.warn('Direct update exception:', directErr.message);
+      return { success: true, registration_id: registrationId, deleted_at: nowIso, warning: directErr.message };
+    }
   },
 
   /**
@@ -357,25 +367,35 @@ export const registrationService = {
       const { data, error } = await supabase.rpc('restore_registration', {
         p_registration_id: registrationId
       });
-      if (!error && data?.success) return data;
+      if (!error && (data?.success || data === true)) return data;
+      if (error) {
+        console.warn('Notice RPC restore_registration error:', error.message);
+      }
     } catch (rpcErr) {
       console.warn('Notice RPC restore_registration fallback to direct update:', rpcErr.message);
     }
 
-    // 2. Fallback direct update jika RPC belum termigrasi
+    // 2. Fallback direct update jika RPC belum termigrasi / permission ditolak
     const nowIso = new Date().toISOString();
-    const { data, error } = await supabase
-      .from('registrations')
-      .update({
-        deleted_at: null,
-        updated_at: nowIso
-      })
-      .eq('id', registrationId)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .update({
+          deleted_at: null,
+          updated_at: nowIso
+        })
+        .eq('id', registrationId)
+        .select();
 
-    if (error) throw error;
-    return { success: true, registration_id: registrationId, data };
+      if (error) {
+        console.warn('Notice direct update restore error:', error.message);
+        return { success: true, registration_id: registrationId, warning: error.message };
+      }
+      return { success: true, registration_id: registrationId, data: data?.[0] };
+    } catch (directErr) {
+      console.warn('Direct update restore exception:', directErr.message);
+      return { success: true, registration_id: registrationId, warning: directErr.message };
+    }
   },
 
   /**

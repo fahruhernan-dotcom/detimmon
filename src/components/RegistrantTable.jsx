@@ -36,8 +36,10 @@ export default function RegistrantTable({
   const [filter, setFilter] = useState('all');
   const [search, setSearch] = useState('');
 
+  const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
+
   const filteredData = useMemo(() => {
-    return registrants.filter((item) => {
+    return activeRegistrants.filter((item) => {
       if (filter === 'pending' && item.statusBayar !== 'PENDING') return false;
       if (filter === 'lunas' && item.statusBayar !== 'LUNAS') return false;
 
@@ -53,7 +55,7 @@ export default function RegistrantTable({
       }
       return true;
     });
-  }, [registrants, filter, search]);
+  }, [activeRegistrants, filter, search]);
 
   const getWhatsAppTicketUrl = (item) => {
     const text = 
@@ -78,7 +80,7 @@ Pengingat Rebate: Tiket Rp 100.000 Kakak berlaku penuh sebagai voucher potongan 
 
 Sampai jumpa di kelas virtual, Kak!`;
 
-    return `https://wa.me/${item.whatsapp}?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${item.whatsapp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(text)}`;
   };
 
   return (
@@ -91,7 +93,7 @@ Sampai jumpa di kelas virtual, Kak!`;
               Manajemen Responden & Verifikasi Mutasi Bank
             </h2>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
-              {registrants.length} Data
+              {activeRegistrants.length} Data
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
@@ -131,7 +133,7 @@ Sampai jumpa di kelas virtual, Kak!`;
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Semua ({registrants.length})
+              Semua ({activeRegistrants.length})
             </button>
             <button
               onClick={() => setFilter('pending')}
@@ -141,7 +143,7 @@ Sampai jumpa di kelas virtual, Kak!`;
                   : 'text-slate-600 hover:text-amber-800'
               }`}
             >
-              Pending ({registrants.filter(r => r.statusBayar !== 'LUNAS').length})
+              Pending ({activeRegistrants.filter(r => r.statusBayar !== 'LUNAS').length})
             </button>
             <button
               onClick={() => setFilter('lunas')}
@@ -151,7 +153,7 @@ Sampai jumpa di kelas virtual, Kak!`;
                   : 'text-slate-600 hover:text-emerald-800'
               }`}
             >
-              Lunas ({registrants.filter(r => r.statusBayar === 'LUNAS').length})
+              Lunas ({activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length})
             </button>
           </div>
 

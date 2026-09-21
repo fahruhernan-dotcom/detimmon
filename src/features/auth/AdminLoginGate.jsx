@@ -93,8 +93,13 @@ export default function AdminLoginGate({ onBackToPublic }) {
       return;
     }
 
-    const validToken = import.meta.env.VITE_ADMIN_API_TOKEN || 'dignity_secret_admin_2026';
-    if (passcode.trim() === validToken) {
+    const validToken = import.meta.env.VITE_ADMIN_API_TOKEN;
+    if (!validToken) {
+      setErrorMessage('Passkey Operator belum disetel di file .env (VITE_ADMIN_API_TOKEN). Hubungi administrator.');
+      return;
+    }
+
+    if (passcode.trim() === validToken.trim()) {
       setFailedAttempts(0);
       setLockoutUntil(0);
       loginAsStaff({
