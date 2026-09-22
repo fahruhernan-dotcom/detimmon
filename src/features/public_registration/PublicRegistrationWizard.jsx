@@ -21,8 +21,20 @@ import {
   Printer,
   AlertCircle,
   ExternalLink,
-  MessageCircle
+  MessageCircle,
+  HelpCircle,
+  FileCheck
 } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { formatRupiah } from '../../utils/formatters';
 import { normalizeCertificateName, normalizeEmail, normalizeWhatsApp, isValidUuid } from '../../utils/normalizers';
 import { registrationService, voucherService } from '../../services/registrationService';
@@ -203,6 +215,27 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registeredResult, setRegisteredResult] = useState(null);
   const [copiedAccount, setCopiedAccount] = useState(false);
+
+  // Duplicate Registration Alert Dialog State
+  const [duplicateModalOpen, setDuplicateModalOpen] = useState(false);
+  const [duplicateModalData, setDuplicateModalData] = useState(null);
+
+  // Helper sanitasi teks publik agar istilah internal panitia (tempat sampah) tidak pernah bocor ke peserta
+  const sanitizePublicMessage = (msg) => {
+    if (!msg) return 'Data nama, email, atau nomor WhatsApp Anda sudah pernah tercatat pada sistem kami untuk acara ini.';
+    return msg
+      .replace(/dari tempat sampah/gi, 'dalam sistem')
+      .replace(/tempat sampah/gi, 'arsip sistem')
+      .replace(/dipulihkan/gi, 'diperbarui');
+  };
+
+  const handleProceedDuplicateReceipt = () => {
+    if (duplicateModalData) {
+      setRegisteredResult(duplicateModalData);
+      setStep(5);
+    }
+    setDuplicateModalOpen(false);
+  };
 
   const eventTitle = currentEvent?.title || "Pelatihan Public Speaking Dignity";
   const eventDate = currentEvent?.date_start 
@@ -390,9 +423,16 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
 
           if (rpcRes?.is_duplicate) {
             newRegistration.isDuplicate = true;
-            newRegistration.duplicateMessage = rpcRes.message;
+            newRegistration.duplicateMessage = sanitizePublicMessage(rpcRes.message);
             if (rpcRes.ticket_number) newRegistration.nomorTicket = rpcRes.ticket_number;
             if (rpcRes.status === 'PAID') newRegistration.statusBayar = 'VERIFIED';
+
+            // Tampilkan AlertDialog interaktif untuk memberitahu pendaftar
+            setDuplicateModalData(newRegistration);
+            setDuplicateModalOpen(true);
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+            return;
           } else if (rpcRes?.ticket_number) {
             newRegistration.nomorTicket = rpcRes.ticket_number;
           }
@@ -404,7 +444,12 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
 
           if (isDuplicateConstraint) {
             newRegistration.isDuplicate = true;
-            newRegistration.duplicateMessage = 'Nomor WhatsApp atau email Anda sudah pernah tercatat pada sistem kami untuk acara ini. Data pendaftaran Anda aman dan sedang diproses oleh panitia.';
+            newRegistration.duplicateMessage = 'Nomor WhatsApp atau email Anda sudah pernah tercatat pada sistem kami untuk acara ini. Data pendaftaran Anda aman dan sedang menunggu verifikasi oleh panitia.';
+            setDuplicateModalData(newRegistration);
+            setDuplicateModalOpen(true);
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+            return;
           } else {
             alert(`Pendaftaran belum dapat diproses: ${dbErr.message || 'Silakan coba beberapa saat lagi atau hubungi panitia via WhatsApp.'}`);
             setIsSubmitting(false);
@@ -1248,7 +1293,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                 </p>
               </div>
 
-              {/* Duplicate Notice Banner if previously registered */}
+              {/* Duplicate Notice Banner if previously registered (Sanitized - Zero Trash Jargon) */}
               {registeredResult.isDuplicate && (
                 <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/90 text-left space-y-1 text-xs text-amber-950">
                   <div className="flex items-center gap-1.5 font-semibold">
@@ -1256,25 +1301,55 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                     <span>Pendaftaran Sebelumnya Terdeteksi</span>
                   </div>
                   <p className="text-[11.5px] font-light leading-relaxed">
-                    {registeredResult.duplicateMessage || "Data nama/email/nomor WhatsApp Anda sudah pernah tercatat pada sistem kami untuk acara ini."}
+                    {sanitizePublicMessage(registeredResult.duplicateMessage)}
                   </p>
                 </div>
               )}
 
-              {/* Official Ticket Box - Quiet Luxury Dossier */}
-              <div className="p-4.5 bg-[#FAF9F6] rounded-2xl border-2 border-[#0A192F] shadow-xs flex items-center justify-between text-left">
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-widest text-stone-500 font-semibold block">
-                    NOMOR E-TICKET RESMI:
-                  </span>
-                  <strong className="font-mono text-base sm:text-lg text-stone-900 font-bold tracking-tight block mt-0.5">
-                    {registeredResult.nomorTicket || registeredResult.id}
-                  </strong>
+              {/* Box Status Tiket & Registrasi - Gating E-Ticket Resmi vs Kode Registrasi Sementara */}
+              {registeredResult.statusBayar === 'VERIFIED' ? (
+                <div className="p-4.5 bg-emerald-50/70 rounded-2xl border-2 border-emerald-600 shadow-xs flex items-center justify-between text-left">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                      <span className="text-[10px] uppercase font-mono tracking-widest text-emerald-800 font-semibold block">
+                        NOMOR E-TICKET RESMI (AKTIF):
+                      </span>
+                    </div>
+                    <strong className="font-mono text-base sm:text-lg text-emerald-950 font-bold tracking-tight block mt-0.5">
+                      {registeredResult.nomorTicket || registeredResult.id}
+                    </strong>
+                    <span className="text-[11px] text-emerald-800 font-light mt-0.5 block">
+                      Tiket resmi Anda telah aktif. Tautan Zoom & WhatsApp Group dapat diakses di bawah.
+                    </span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-white border border-emerald-200 flex items-center justify-center text-emerald-700 shadow-2xs shrink-0">
+                    <Ticket className="w-5 h-5 stroke-[1.5]" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-[#0A192F] shadow-2xs">
-                  <Ticket className="w-5 h-5 stroke-[1.5]" />
+              ) : (
+                <div className="p-4.5 bg-[#FAF9F6] rounded-2xl border border-stone-300 shadow-xs flex items-center justify-between text-left">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] uppercase font-mono tracking-widest text-stone-500 font-semibold block">
+                        KODE PENDAFTARAN SEMENTARA:
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-medium bg-amber-100 text-amber-900 border border-amber-200">
+                        TIKET BELUM AKTIF
+                      </span>
+                    </div>
+                    <strong className="font-mono text-base sm:text-lg text-stone-900 font-bold tracking-tight block mt-0.5">
+                      {registeredResult.nomorTicket || registeredResult.id}
+                    </strong>
+                    <p className="text-[11px] text-stone-500 font-light mt-1 leading-snug">
+                      Status: <strong className="text-stone-700">Menunggu Verifikasi Admin</strong>. Tiket resmi ber-barcode & akses webinar akan diterbitkan otomatis setelah pembayaran dicek & diverifikasi oleh Admin.
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-stone-500 shadow-2xs shrink-0">
+                    <Clock className="w-5 h-5 stroke-[1.5]" />
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Receipt Card */}
               <div className="p-5 rounded-2xl bg-white border border-stone-200/90 text-left space-y-2.5 text-xs shadow-2xs">
@@ -1339,7 +1414,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                   </p>
                   <a
                     href={`https://wa.me/6289681077483?text=${encodeURIComponent(
-                      `Halo Admin Dignity, saya koordinator pendaftar ${registeredResult.nama} (Tiket: ${registeredResult.nomorTicket || registeredResult.id}) paket ${registeredResult.kategori}.\n\nBerikut daftar nama, email, dan WhatsApp anggota kelompok saya:\n1. ...\n2. ...\n3. ...`
+                      `Halo Admin Dignity, saya koordinator pendaftar ${registeredResult.nama} (${registeredResult.statusBayar === 'VERIFIED' ? 'No. Tiket' : 'No. Registrasi'}: ${registeredResult.nomorTicket || registeredResult.id}) paket ${registeredResult.kategori}.\n\nBerikut daftar nama, email, dan WhatsApp anggota kelompok saya:\n1. ...\n2. ...\n3. ...`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -1370,7 +1445,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                 {registeredResult.statusBayar !== 'VERIFIED' && (
                   <a
                     href={`https://wa.me/6289681077483?text=${encodeURIComponent(
-                      `Halo Admin LPK Dignity, saya telah mendaftar acara ${eventTitle} atas nama ${registeredResult.nama} (Tiket: ${registeredResult.nomorTicket || registeredResult.id}). Saya telah mengunggah bukti pembayaran via web, mohon dibantu verifikasi. Terima kasih!`
+                      `Halo Admin LPK Dignity, saya telah mendaftar acara ${eventTitle} atas nama ${registeredResult.nama} (${registeredResult.statusBayar === 'VERIFIED' ? 'No. Tiket' : 'No. Registrasi'}: ${registeredResult.nomorTicket || registeredResult.id}). Saya telah mengunggah bukti pembayaran via web, mohon dibantu verifikasi. Terima kasih!`
                     )}`}
                     target="_blank"
                     rel="noreferrer"
@@ -1398,6 +1473,55 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
 
       </div>
       )}
+
+      {/* ── ALERT DIALOG: PENDAFTARAN SEBELUMNYA TERDETEKSI (SUBMIT GANDA) ── */}
+      <AlertDialog open={duplicateModalOpen} onOpenChange={setDuplicateModalOpen}>
+        <AlertDialogContent className="bg-white border border-stone-200/90 rounded-2xl p-6 shadow-2xl max-w-md">
+          <AlertDialogHeader className="text-left space-y-2">
+            <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-1">
+              <AlertCircle className="w-6 h-6 stroke-[1.5]" />
+            </div>
+            <AlertDialogTitle className="text-base sm:text-lg font-serif font-semibold text-stone-900">
+              Pendaftaran Sebelumnya Terdeteksi
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-xs text-stone-600 space-y-2.5 font-light leading-relaxed">
+              <span>
+                Halo <strong>{duplicateModalData?.nama}</strong>, identitas email (<code className="font-mono text-stone-800">{duplicateModalData?.email}</code>) atau nomor WhatsApp (<code className="font-mono text-stone-800">{duplicateModalData?.whatsapp}</code>) Anda sudah pernah tercatat pada sistem kami untuk acara ini.
+              </span>
+              <div className="p-3 bg-[#FAF9F6] rounded-xl border border-stone-200 text-[11px] text-stone-700 space-y-1">
+                <div>
+                  Status Pembayaran: <strong className={duplicateModalData?.statusBayar === 'VERIFIED' ? 'text-emerald-800' : 'text-amber-900'}>
+                    {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Terverifikasi (Lunas)' : 'Menunggu Verifikasi Admin'}
+                  </strong>
+                </div>
+                <div>
+                  {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Nomor Tiket Resmi:' : 'No. Registrasi Sementara:'}{' '}
+                  <code className="font-mono font-bold text-stone-900">{duplicateModalData?.nomorTicket || duplicateModalData?.id}</code>
+                </div>
+              </div>
+              <span className="block text-[11px] text-stone-500">
+                {duplicateModalData?.statusBayar === 'VERIFIED'
+                  ? 'Tiket resmi Anda sudah aktif. Anda dapat langsung membuka tanda terima resmi pendaftaran Anda.'
+                  : '⚠️ Tiket resmi acara belum aktif. Bukti transfer terbaru Anda telah kami simpan dan E-Ticket resmi akan diterbitkan setelah pembayaran diverifikasi oleh Admin.'}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-2">
+            <AlertDialogCancel
+              onClick={() => setDuplicateModalOpen(false)}
+              className="text-xs rounded-xl py-2.5 text-stone-600 hover:text-stone-900 border-stone-200"
+            >
+              Periksa Kembali Data
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleProceedDuplicateReceipt}
+              className="text-xs rounded-xl py-2.5 bg-[#0A192F] hover:bg-[#112240] text-white"
+            >
+              Buka Tanda Terima Pendaftaran ↗
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
