@@ -701,6 +701,54 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
     }
   };
 
+  // Actions: Permanent Hard Delete Participant from Database
+  const handlePermanentDeleteParticipant = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    // Optimistic UI update
+    setRegistrants(prev => prev.filter(item => item.id !== id));
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(null);
+    }
+
+    try {
+      const regDbId = target.supabaseRegistrationId || target.id;
+      if (regDbId) {
+        await registrationService.deleteRegistration(regDbId);
+      }
+      showToast(`Pendaftar ${target.nama} berhasil dihapus permanen ✓`, 'success');
+    } catch (err) {
+      console.error('Gagal hapus permanen di Supabase:', err);
+      showToast(`Gagal menghapus permanen: ${err.message}`, 'error');
+    }
+  };
+
+  // Actions: Empty All Trash for Active Event
+  const handleEmptyTrash = async () => {
+    const trashList = registrants.filter(r => r.isDeleted);
+    if (trashList.length === 0) {
+      showToast('Tempat sampah sudah kosong.', 'info');
+      return;
+    }
+
+    // Optimistic UI update
+    setRegistrants(prev => prev.filter(item => !item.isDeleted));
+    if (activeDrawerParticipant?.isDeleted) {
+      setActiveDrawerParticipant(null);
+    }
+
+    try {
+      if (activeEvent?.id) {
+        const res = await registrationService.emptyTrash(activeEvent.id);
+        showToast(res?.message || `Tempat sampah berhasil dikosongkan (${trashList.length} pendaftar dihapus) ✓`, 'success');
+      }
+    } catch (err) {
+      console.error('Gagal mengosongkan tempat sampah:', err);
+      showToast(`Gagal mengosongkan tempat sampah: ${err.message}`, 'error');
+    }
+  };
+
   // Actions: Manual Toggle Status with Supabase SSOT
   const handleToggleStatus = async (id) => {
     const target = registrants.find(r => r.id === id);
@@ -1468,6 +1516,8 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
                 hasGoogleToken={Boolean(googleOAuthToken)}
                 onSoftDeleteParticipant={handleSoftDeleteParticipant}
                 onRestoreParticipant={handleRestoreParticipant}
+                onPermanentDeleteParticipant={handlePermanentDeleteParticipant}
+                onEmptyTrash={handleEmptyTrash}
               />
             )}
 
@@ -1808,6 +1858,7 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
           onUpdateNotes={(id, note) => handleUpdateNotes(id, note)}
           onSoftDelete={(id) => handleSoftDeleteParticipant(id)}
           onRestore={(id) => handleRestoreParticipant(id)}
+          onPermanentDelete={(id) => handlePermanentDeleteParticipant(id)}
           hasGoogleToken={Boolean(googleOAuthToken)}
         />
 

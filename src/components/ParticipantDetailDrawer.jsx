@@ -56,6 +56,7 @@ export default function ParticipantDetailDrawer({
   onOpenProfile360,
   onSoftDelete,
   onRestore,
+  onPermanentDelete,
   hasGoogleToken
 }) {
   const confirm = useConfirm();
@@ -196,21 +197,48 @@ export default function ParticipantDetailDrawer({
           
           {/* Status Tempat Sampah / Soft Deleted Banner */}
           {participant.isDeleted && (
-            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center justify-between text-xs animate-fade-in">
-              <div className="flex items-center gap-2">
-                <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>Peserta ini berada di <strong>Tempat Sampah</strong></span>
+            <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 space-y-2.5 text-xs animate-fade-in">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Peserta ini berada di <strong>Tempat Sampah</strong></span>
+                </div>
               </div>
-              {onRestore && (
-                <button
-                  type="button"
-                  onClick={() => onRestore(participant.id)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-2xs transition-colors"
-                >
-                  <RotateCcw className="w-3 h-3" />
-                  <span>Pulihkan</span>
-                </button>
-              )}
+              <div className="flex items-center gap-2 pt-1">
+                {onRestore && (
+                  <button
+                    type="button"
+                    onClick={() => onRestore(participant.id)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Pulihkan</span>
+                  </button>
+                )}
+                {onPermanentDelete && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Hapus Permanen Peserta?',
+                        description: `Pendaftar "${participant.nama}" akan dihapus permanen dari database beserta tiket dan log pembayaran.`,
+                        note: 'Tindakan ini tidak dapat dibatalkan (Irreversible).',
+                        variant: 'danger',
+                        confirmText: 'Ya, Hapus Permanen',
+                        cancelText: 'Batalkan'
+                      });
+                      if (ok) {
+                        onPermanentDelete(participant.id);
+                        onClose();
+                      }
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus Permanen</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
@@ -521,16 +549,41 @@ export default function ParticipantDetailDrawer({
         <div className="shrink-0 p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-2">
             {participant.isDeleted ? (
-              onRestore && (
-                <button
-                  type="button"
-                  onClick={() => onRestore(participant.id)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-bold transition-colors"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Pulihkan Peserta</span>
-                </button>
-              )
+              <div className="flex items-center gap-2">
+                {onRestore && (
+                  <button
+                    type="button"
+                    onClick={() => onRestore(participant.id)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 font-bold transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Pulihkan Peserta</span>
+                  </button>
+                )}
+                {onPermanentDelete && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Hapus Permanen Peserta?',
+                        description: `Pendaftar "${participant.nama}" akan dihapus permanen dari database. Tindakan ini tidak dapat dibatalkan.`,
+                        note: 'Seluruh riwayat tiket dan pembayaran akan ikut dihapus.',
+                        variant: 'danger',
+                        confirmText: 'Hapus Permanen',
+                        cancelText: 'Batalkan'
+                      });
+                      if (ok) {
+                        onPermanentDelete(participant.id);
+                        onClose();
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Hapus Permanen</span>
+                  </button>
+                )}
+              </div>
             ) : (
               onSoftDelete && (
                 <button

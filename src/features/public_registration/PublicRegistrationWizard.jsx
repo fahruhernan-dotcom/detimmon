@@ -389,11 +389,20 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
             newRegistration.nomorTicket = rpcRes.ticket_number;
           }
         } catch (dbErr) {
-          console.error('Error submit pendaftaran ke database:', dbErr);
-          alert(`Gagal memproses pendaftaran ke database: ${dbErr.message}`);
-          setIsSubmitting(false);
-          isSubmittingRef.current = false;
-          return;
+          console.warn('Notice exception submit pendaftaran ke database:', dbErr);
+          const isDuplicateConstraint = dbErr?.message?.includes('idx_registrations_event_person_active') ||
+            dbErr?.message?.includes('duplicate key') ||
+            dbErr?.message?.includes('violates unique constraint');
+
+          if (isDuplicateConstraint) {
+            newRegistration.isDuplicate = true;
+            newRegistration.duplicateMessage = 'Nomor WhatsApp atau email Anda sudah pernah tercatat pada sistem kami untuk acara ini. Data pendaftaran Anda aman dan sedang diproses oleh panitia.';
+          } else {
+            alert(`Pendaftaran belum dapat diproses: ${dbErr.message || 'Silakan coba beberapa saat lagi atau hubungi panitia via WhatsApp.'}`);
+            setIsSubmitting(false);
+            isSubmittingRef.current = false;
+            return;
+          }
         }
       } else {
         alert('Data acara tidak ditemukan. Silakan muat ulang halaman formulir.');

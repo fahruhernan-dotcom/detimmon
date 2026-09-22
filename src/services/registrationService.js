@@ -142,38 +142,93 @@ export const registrationService = {
       personId = newPerson.id;
     }
 
-    // 2. Buat Registrasi
-    const { data: reg, error: regErr } = await supabase
+    // 2. Cek apakah peserta sudah pernah terdaftar di acara ini (Anti-Duplikasi & Soft Delete Recovery)
+    const { data: existingReg } = await supabase
       .from('registrations')
-      .insert({
-        event_id: eventId,
-        person_id: personId,
-        package_type: packageType || 'INDIVIDU',
-        is_mabar: Boolean(isMabar || packageType === 'MABAR_6'),
-        total_due: totalDue || 100000,
-        source_system: 'WEB_NATIVE',
-        source_row_id: sourceRowId || null,
-        custom_notes: notes || null
-      })
-      .select()
-      .single();
+      .select('id, status, deleted_at')
+      .eq('event_id', eventId)
+      .eq('person_id', personId)
+      .maybeSingle();
 
-    if (regErr) throw regErr;
+    let reg = null;
 
-    // 3. Catat entri pembayaran awal (Pending)
+    if (existingReg) {
+      if (existingReg.deleted_at) {
+        // Jika ada di tempat sampah, pulihkan otomatis (Restore & Re-activate)
+        const { data: restoredReg, error: restoreErr } = await supabase
+          .from('registrations')
+          .update({
+            deleted_at: null,
+            status: 'NEW',
+            package_type: packageType || 'INDIVIDU',
+            is_mabar: Boolean(isMabar || packageType === 'MABAR_6'),
+            total_due: totalDue || 100000,
+            custom_notes: notes || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingReg.id)
+          .select()
+          .single();
+
+        if (restoreErr) throw restoreErr;
+        reg = { ...restoredReg, is_duplicate: true, restored_from_trash: true };
+      } else {
+        // Jika sudah aktif, kembalikan record existing sebagai duplicate tanpa melempar SQL error
+        reg = { ...existingReg, is_duplicate: true };
+      }
+    } else {
+      // Buat Registrasi Baru
+      const { data: newReg, error: regErr } = await supabase
+        .from('registrations')
+        .insert({
+          event_id: eventId,
+          person_id: personId,
+          package_type: packageType || 'INDIVIDU',
+          is_mabar: Boolean(isMabar || packageType === 'MABAR_6'),
+          total_due: totalDue || 100000,
+          source_system: 'WEB_NATIVE',
+          source_row_id: sourceRowId || null,
+          custom_notes: notes || null
+        })
+        .select()
+        .single();
+
+      if (regErr) throw regErr;
+      reg = newReg;
+    }
+
+    // 3. Catat atau perbarui entri pembayaran awal (Pending)
     if (reg?.id) {
       try {
-        await supabase
+        const { data: existingPay } = await supabase
           .from('payments')
-          .insert({
-            registration_id: reg.id,
-            amount: totalDue || 100000,
-            payment_method: 'BANK_TRANSFER',
-            bank_destination: bankDestination || 'Bank Mandiri',
-            proof_drive_file_id: proofDriveFileId || rawBukti || null,
-            status: 'PENDING',
-            submitted_at: new Date().toISOString()
-          });
+          .select('id')
+          .eq('registration_id', reg.id)
+          .maybeSingle();
+
+        if (existingPay) {
+          if (proofDriveFileId || rawBukti) {
+            await supabase
+              .from('payments')
+              .update({
+                proof_drive_file_id: proofDriveFileId || rawBukti,
+                submitted_at: new Date().toISOString()
+              })
+              .eq('id', existingPay.id);
+          }
+        } else {
+          await supabase
+            .from('payments')
+            .insert({
+              registration_id: reg.id,
+              amount: totalDue || 100000,
+              payment_method: 'BANK_TRANSFER',
+              bank_destination: bankDestination || 'Bank Mandiri',
+              proof_drive_file_id: proofDriveFileId || rawBukti || null,
+              status: 'PENDING',
+              submitted_at: new Date().toISOString()
+            });
+        }
       } catch (payErr) {
         console.warn('Notice create payment record fallback:', payErr.message);
       }
@@ -404,23 +459,87 @@ export const registrationService = {
   async deleteRegistration(registrationId) {
     if (!registrationId) throw new Error('registrationId wajib diisi');
 
+    // Coba via atomic RPC hard_delete_registration (SECURITY DEFINER)
+    try {
+      const { data, error } = await supabase.rpc('hard_delete_registration', {
+        p_registration_id: registrationId
+      });
+      if (!error && data?.success) {
+        return data;
+      }
+      if (error) {
+        console.warn('Notice RPC hard_delete_registration fallback:', error.message);
+      }
+    } catch (rpcErr) {
+      console.warn('RPC hard_delete_registration exception fallback:', rpcErr.message);
+    }
+
+    // Direct cascade delete fallback
     // 1. Hapus tiket terkait
     await supabase.from('tickets').delete().eq('registration_id', registrationId);
 
-    // 2. Hapus pembayaran terkait
+    // 2. Hapus log penyesuaian & pembayaran terkait
+    await supabase.from('payment_adjustments').delete().eq('registration_id', registrationId);
     await supabase.from('payments').delete().eq('registration_id', registrationId);
 
-    // 3. Hapus registration_members jika ada
+    // 3. Hapus pemakaian voucher
+    await supabase.from('voucher_usages').delete().eq('registration_id', registrationId);
+
+    // 4. Hapus registration_members jika ada
     await supabase.from('registration_members').delete().eq('registration_id', registrationId);
 
-    // 4. Hapus registrasi utama
+    // 5. Hapus registrasi utama
     const { error } = await supabase
       .from('registrations')
       .delete()
       .eq('id', registrationId);
 
     if (error) throw error;
-    return true;
+    return { success: true, registration_id: registrationId };
+  },
+
+  /**
+   * Mengosongkan seluruh tempat sampah pada suatu event secara permanen (Empty Trash)
+   */
+  async emptyTrash(eventId) {
+    if (!eventId) throw new Error('eventId wajib diisi');
+
+    // Coba via atomic RPC empty_event_trash (SECURITY DEFINER)
+    try {
+      const { data, error } = await supabase.rpc('empty_event_trash', {
+        p_event_id: eventId
+      });
+      if (!error && data?.success) {
+        return data;
+      }
+      if (error) {
+        console.warn('Notice RPC empty_event_trash fallback:', error.message);
+      }
+    } catch (rpcErr) {
+      console.warn('RPC empty_event_trash exception fallback:', rpcErr.message);
+    }
+
+    // Direct fallback
+    const { data: trashRows } = await supabase
+      .from('registrations')
+      .select('id')
+      .eq('event_id', eventId)
+      .not('deleted_at', 'is', null);
+
+    if (!trashRows || trashRows.length === 0) {
+      return { success: true, deleted_count: 0, message: 'Tempat sampah sudah kosong.' };
+    }
+
+    const regIds = trashRows.map(r => r.id);
+    await supabase.from('tickets').delete().in('registration_id', regIds);
+    await supabase.from('payment_adjustments').delete().in('registration_id', regIds);
+    await supabase.from('payments').delete().in('registration_id', regIds);
+    await supabase.from('voucher_usages').delete().in('registration_id', regIds);
+    await supabase.from('registration_members').delete().in('registration_id', regIds);
+    const { error } = await supabase.from('registrations').delete().in('id', regIds);
+
+    if (error) throw error;
+    return { success: true, deleted_count: regIds.length };
   },
 
   /**

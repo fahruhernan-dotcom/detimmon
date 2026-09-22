@@ -12,9 +12,11 @@ import {
   Eye,
   Sparkles,
   Globe,
-  Trash2
+  Trash2,
+  RotateCcw
 } from 'lucide-react';
 import { formatRupiah, formatDate } from '../../utils/formatters';
+import { useConfirm } from '../../context/ConfirmContext';
 
 /**
  * RegistrantsView — Focused registration workspace
@@ -31,8 +33,12 @@ export default function RegistrantsView({
   onBackupToDrive,
   onOpenWebSettings,
   hasGoogleToken,
-  initialFilter = 'all'
+  initialFilter = 'all',
+  onRestoreParticipant,
+  onPermanentDeleteParticipant,
+  onEmptyTrash
 }) {
+  const confirm = useConfirm();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [packageFilter, setPackageFilter] = useState('all');
@@ -183,20 +189,49 @@ export default function RegistrantsView({
 
       {/* Notice Banner jika sedang di tab Sampah */}
       {statusFilter === 'trash' && (
-        <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex items-center justify-between animate-fade-in">
-          <div className="flex items-center gap-2">
-            <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
-            <span>
-              Menampilkan <strong>{deletedRegistrants.length} pendaftar</strong> di Tempat Sampah. Klik baris pendaftar untuk melihat detail atau memulihkannya.
-            </span>
+        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0 text-rose-700">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="font-bold text-rose-900">
+                Tempat Sampah ({deletedRegistrants.length} Pendaftar)
+              </div>
+              <div className="text-[11px] text-rose-700">
+                Pendaftar di sini tidak aktif. Anda dapat memulihkannya atau menghapusnya secara permanen.
+              </div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setStatusFilter('all')}
-            className="text-[11px] font-bold text-rose-700 hover:text-rose-900 underline underline-offset-2 cursor-pointer"
-          >
-            Kembali ke Peserta Aktif
-          </button>
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            {deletedRegistrants.length > 0 && onEmptyTrash && (
+              <button
+                type="button"
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: 'Kosongkan Seluruh Tempat Sampah?',
+                    description: `Semua (${deletedRegistrants.length}) pendaftar di tempat sampah akan DIHAPUS PERMANEN dari database beserta tiket dan log pembayarannya.`,
+                    note: 'Tindakan ini tidak dapat dibatalkan (Irreversible).',
+                    variant: 'danger',
+                    confirmText: 'Ya, Kosongkan Semua',
+                    cancelText: 'Batalkan'
+                  });
+                  if (ok) onEmptyTrash();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Kosongkan Tempat Sampah</span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-100/60 border border-rose-200 text-rose-800 font-semibold text-xs transition-colors cursor-pointer"
+            >
+              Kembali ke Aktif
+            </button>
+          </div>
         </div>
       )}
 
@@ -316,12 +351,57 @@ export default function RegistrantsView({
                         </div>
                       </td>
 
-                      {/* Chevron Action */}
+                      {/* Action Column */}
                       <td className="py-3.5 px-4 text-right">
-                        <div className="inline-flex items-center gap-1 text-slate-400 group-hover:text-amber-700 transition-colors text-xs font-medium">
-                          <span className="hidden lg:inline">Detail</span>
-                          <ChevronRight className="w-4 h-4" />
-                        </div>
+                        {item.isDeleted ? (
+                          <div className="inline-flex items-center gap-1.5 justify-end" onClick={(e) => e.stopPropagation()}>
+                            {onRestoreParticipant && (
+                              <button
+                                type="button"
+                                onClick={() => onRestoreParticipant(item.id)}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-[11px] font-bold transition-colors cursor-pointer"
+                                title="Pulihkan pendaftar ke daftar aktif"
+                              >
+                                <RotateCcw className="w-3 h-3" />
+                                <span className="hidden md:inline">Pulihkan</span>
+                              </button>
+                            )}
+                            {onPermanentDeleteParticipant && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  const ok = await confirm({
+                                    title: 'Hapus Permanen Peserta?',
+                                    description: `Pendaftar "${item.nama}" akan dihapus permanen dari database. Tindakan ini tidak dapat dibatalkan.`,
+                                    note: 'Tiket dan data pembayaran akan ikut terhapus.',
+                                    variant: 'danger',
+                                    confirmText: 'Hapus Permanen',
+                                    cancelText: 'Batalkan'
+                                  });
+                                  if (ok) onPermanentDeleteParticipant(item.id);
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-[11px] font-bold transition-colors cursor-pointer"
+                                title="Hapus permanen dari database"
+                              >
+                                <Trash2 className="w-3 h-3 text-rose-600" />
+                                <span className="hidden md:inline">Hapus</span>
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => onSelectParticipant && onSelectParticipant(item)}
+                              className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                              title="Lihat Detail"
+                            >
+                              <ChevronRight className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="inline-flex items-center gap-1 text-slate-400 group-hover:text-amber-700 transition-colors text-xs font-medium">
+                            <span className="hidden lg:inline">Detail</span>
+                            <ChevronRight className="w-4 h-4" />
+                          </div>
+                        )}
                       </td>
                     </tr>
                   );
