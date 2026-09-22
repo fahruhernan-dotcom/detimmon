@@ -127,6 +127,9 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
     });
   }, [groupAdditionalCount]);
 
+  // Mode Pengisian Anggota Rombongan: 'NOW' (isi sekarang) | 'LATER' (lengkapi menyusul)
+  const [groupFillMode, setGroupFillMode] = useState('NOW');
+
   // ── Voucher Rebate State ──────────────────────────────
   const [voucherInput, setVoucherInput]     = useState('');
   const [appliedVoucher, setAppliedVoucher] = useState(null); // response dari validate_voucher RPC
@@ -345,8 +348,11 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
         nomorTicket: defaultTicketNo,
         timestamp: new Date().toISOString(),
         isDuplicate: false,
+        groupFillMode,
         mabarNotes: isGroupPackage 
-          ? mabarMembers.slice(0, groupAdditionalCount).filter(m => m.nama.trim()).map((m, i) => `${i+1}. ${m.nama} (${m.whatsapp})`).join(', ')
+          ? (groupFillMode === 'LATER'
+              ? '[DATA ANGGOTA MENYUSUL VIA WA/PANITIA]'
+              : mabarMembers.slice(0, groupAdditionalCount).filter(m => m.nama.trim()).map((m, i) => `${i+1}. ${m.nama} (${m.whatsapp}${m.email ? ' • ' + m.email : ''})`).join(', ') || '[DATA ANGGOTA MENYUSUL VIA WA/PANITIA]')
           : '',
         voucherCode: appliedVoucher?.code || null,
         voucherDiscount: voucherDiscount || 0
@@ -368,7 +374,9 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
             bankDestination: primaryData.bank,
             proofData: resolvedProof || null,
             notes: [newRegistration.mabarNotes, voucherNotesStr].filter(Boolean).join(' | ') || null,
-            mabarMembers: isGroupPackage ? mabarMembers.slice(0, groupAdditionalCount) : [],
+            mabarMembers: (isGroupPackage && groupFillMode === 'NOW')
+              ? mabarMembers.slice(0, groupAdditionalCount).filter(m => m.nama.trim())
+              : [],
             voucherCode: appliedVoucher?.valid ? voucherInput : null  // [v2] server re-validates atomically
           });
 
@@ -811,48 +819,111 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
 
               {/* If Group / MABAR, show dynamic members form */}
               {isGroupPackage && (
-                <div className="p-4 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 space-y-3 pt-3.5">
-                  <div className="flex items-center justify-between border-b border-stone-200/60 pb-2">
-                    <span className="font-semibold text-stone-800 text-xs">
-                      Daftar {groupAdditionalCount} Anggota Tambahan (Total {groupTotalPax} Peserta)
-                    </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-medium border border-emerald-200">
-                      Bonus 1 Gratis
+                <div className="p-4.5 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 space-y-3.5 pt-3.5">
+                  <div className="flex items-center justify-between border-b border-stone-200/60 pb-2.5">
+                    <div>
+                      <span className="font-semibold text-stone-900 text-xs flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-[#0A192F]" />
+                        <span>Data {groupAdditionalCount} Rekan Tambahan (Total {groupTotalPax} Peserta)</span>
+                      </span>
+                      <p className="text-[11px] text-stone-500 font-light mt-0.5">
+                        Pendaftar utama di atas dihitung otomatis sebagai Peserta #1.
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-semibold border border-emerald-200 shrink-0">
+                      Promo {groupPaidCount}+{groupBonusCount} (Bonus 1)
                     </span>
                   </div>
-                  <p className="text-[11px] text-stone-500 font-light leading-relaxed">
-                    Pendaftar utama di atas dihitung sebagai Peserta #1. Mohon lengkapi data anggota kelompok Anda:
-                  </p>
-                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-                    {mabarMembers.slice(0, groupAdditionalCount).map((m, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-white border border-stone-200/80 space-y-2 shadow-2xs">
-                        <div className="font-medium text-stone-700 flex items-center justify-between text-[11px]">
-                          <span>Anggota #{idx + 2}</span>
-                          {idx === groupAdditionalCount - 1 && (
-                            <span className="text-emerald-700 font-medium text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
-                              Tiket Bonus Gratis
-                            </span>
-                          )}
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <input
-                            type="text"
-                            placeholder="Nama Lengkap & Gelar"
-                            value={m.nama}
-                            onChange={(e) => handleUpdateMember(idx, 'nama', e.target.value)}
-                            className="px-2.5 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white text-stone-900"
-                          />
-                          <input
-                            type="tel"
-                            placeholder="Nomor WhatsApp"
-                            value={m.whatsapp}
-                            onChange={(e) => handleUpdateMember(idx, 'whatsapp', e.target.value)}
-                            className="px-2.5 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white font-mono text-stone-900"
-                          />
-                        </div>
+
+                  {/* Segmented Control Mode Pengisian: Sekarang vs Nanti */}
+                  <div className="grid grid-cols-2 gap-1.5 p-1 bg-stone-100/90 rounded-xl border border-stone-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setGroupFillMode('NOW')}
+                      className={`py-2 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        groupFillMode === 'NOW'
+                          ? 'bg-white text-stone-900 shadow-xs border border-stone-200/90 font-semibold'
+                          : 'text-stone-600 hover:text-stone-900'
+                      }`}
+                    >
+                      <span>✍️ Isi Data Rekan Sekarang</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setGroupFillMode('LATER')}
+                      className={`py-2 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        groupFillMode === 'LATER'
+                          ? 'bg-white text-stone-900 shadow-xs border border-stone-200/90 font-semibold'
+                          : 'text-stone-600 hover:text-stone-900'
+                      }`}
+                    >
+                      <span>⏳ Kirim Menyusul (Bayar Dulu)</span>
+                    </button>
+                  </div>
+
+                  {/* Mode A: Isi Sekarang */}
+                  {groupFillMode === 'NOW' ? (
+                    <div className="space-y-3">
+                      <p className="text-[11px] text-stone-500 font-light leading-relaxed">
+                        Mohon lengkapi nama lengkap untuk sertifikat, email untuk pengiriman e-ticket, dan nomor WhatsApp untuk akses webinar:
+                      </p>
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                        {mabarMembers.slice(0, groupAdditionalCount).map((m, idx) => (
+                          <div key={idx} className="p-3.5 rounded-xl bg-white border border-stone-200/90 space-y-2.5 shadow-2xs">
+                            <div className="font-medium text-stone-700 flex items-center justify-between text-[11px]">
+                              <span className="font-semibold text-stone-900">Anggota #{idx + 2}</span>
+                              {idx === groupAdditionalCount - 1 ? (
+                                <span className="text-emerald-700 font-semibold text-[10px] bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-mono">
+                                  🎁 Tiket Bonus Gratis
+                                </span>
+                              ) : (
+                                <span className="text-stone-400 font-mono text-[10px]">Tiket Akses Penuh</span>
+                              )}
+                            </div>
+                            <div>
+                              <input
+                                type="text"
+                                placeholder="Nama Lengkap & Gelar (untuk Sertifikat)"
+                                value={m.nama}
+                                onChange={(e) => handleUpdateMember(idx, 'nama', e.target.value)}
+                                className="w-full px-3 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white text-stone-900 placeholder:text-stone-400 transition-all"
+                              />
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <input
+                                type="email"
+                                placeholder="Alamat Email (E-Ticket & Sertifikat)"
+                                value={m.email}
+                                onChange={(e) => handleUpdateMember(idx, 'email', e.target.value)}
+                                className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white text-stone-900 placeholder:text-stone-400 transition-all"
+                              />
+                              <input
+                                type="tel"
+                                placeholder="No. WhatsApp (Akses Zoom)"
+                                value={m.whatsapp}
+                                onChange={(e) => handleUpdateMember(idx, 'whatsapp', e.target.value)}
+                                className="px-3 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white font-mono text-stone-900 placeholder:text-stone-400 transition-all"
+                              />
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    /* Mode B: Lengkapi Menyusul */
+                    <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-200/90 text-amber-950 space-y-2 text-xs leading-relaxed animate-fade-in">
+                      <div className="flex items-center gap-2 font-semibold text-amber-900">
+                        <Clock className="w-4 h-4 text-amber-700 shrink-0" />
+                        <span>Data Anggota Dapat Dilengkapi Menyusul</span>
+                      </div>
+                      <p className="text-[11.5px] font-light text-amber-900/90">
+                        Anda dapat menyelesaikan proses pembayaran untuk <strong>mengunci slot kuota Promo {groupPaidCount}+{groupBonusCount}</strong> sekarang.
+                      </p>
+                      <p className="text-[11px] font-light text-amber-800">
+                        Daftar nama lengkap, email, dan nomor WhatsApp rekan kelompok Anda dapat dikirimkan kepada panitia melalui tautan WhatsApp resmi yang tersedia di tanda terima setelah pendaftaran berhasil.
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1253,6 +1324,30 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                   <p className="text-emerald-900/80 text-[11.5px] font-light">
                     Silakan langsung bergabung ke WhatsApp Group resmi peserta untuk mengakses link Zoom & materi pelatihan.
                   </p>
+                </div>
+              )}
+
+              {/* Khusus Pendaftaran Promo Rombongan dengan Mode Isi Menyusul */}
+              {registeredResult.groupFillMode === 'LATER' && (
+                <div className="p-4 rounded-2xl bg-amber-50/90 border border-amber-200/90 text-left space-y-2 text-xs text-amber-950">
+                  <div className="flex items-center gap-2 font-semibold text-amber-900">
+                    <Users className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>Lengkapi Daftar Anggota Kelompok Anda</span>
+                  </div>
+                  <p className="text-[11.5px] font-light text-amber-900/90 leading-relaxed">
+                    Anda memilih opsi pengisian data anggota menyusul. Mohon kirimkan daftar nama lengkap (beserta gelar untuk sertifikat), alamat email aktif, dan nomor WhatsApp rekan Anda kepada panitia sebelum H-1 acara.
+                  </p>
+                  <a
+                    href={`https://wa.me/6289681077483?text=${encodeURIComponent(
+                      `Halo Admin Dignity, saya koordinator pendaftar ${registeredResult.nama} (Tiket: ${registeredResult.nomorTicket || registeredResult.id}) paket ${registeredResult.kategori}.\n\nBerikut daftar nama, email, dan WhatsApp anggota kelompok saya:\n1. ...\n2. ...\n3. ...`
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-2.5 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs transition-colors inline-flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>Kirim Daftar Anggota ke WhatsApp Admin ↗</span>
+                  </a>
                 </div>
               )}
 
