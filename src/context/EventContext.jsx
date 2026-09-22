@@ -6,7 +6,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
  */
 export const DEFAULT_WEB_REGISTRATION_CONFIG = {
   is_open: true,
-  close_message: "Pendaftaran untuk program ini saat ini ditutup. Pantau batch selanjutnya melalui Instagram @lpkdignity.",
+  close_message: "Pendaftaran untuk program ini saat ini ditutup. Pantau batch selanjutnya melalui Instagram @indonesiadignity.",
   intake_source: "WEB_NATIVE",
   banks: [],
   payment_time_limit_hours: 24,

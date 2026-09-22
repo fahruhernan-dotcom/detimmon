@@ -149,12 +149,25 @@
   background: #94A3B8;
 }
 
-/* Print Specific Rules for Certificate PDF Export */
+/* Print Specific Rules for Certificate, Ticket, Receipt & Rundown PDF Exports */
 @media print {
-  body * {
+  /* Hide non-printable elements */
+  nav, header, footer, button, .no-print, [aria-hidden="true"] {
+    display: none !important;
+  }
+
+  /* Universal high fidelity print colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* 1. KASUS KHUSUS: E-Sertifikat Digital Canvas */
+  body:has(#printable-certificate-canvas) * {
     visibility: hidden !important;
   }
-  #printable-certificate-canvas, #printable-certificate-canvas * {
+  body:has(#printable-certificate-canvas) #printable-certificate-canvas,
+  body:has(#printable-certificate-canvas) #printable-certificate-canvas * {
     visibility: visible !important;
   }
   #printable-certificate-canvas {
@@ -169,6 +182,90 @@
     background: #ffffff !important;
     color: #0A192F !important;
     border: 8px double #D4AF37 !important;
+    z-index: 99999 !important;
+  }
+
+  /* 2. KASUS KHUSUS: Modal E-Ticket Peserta (Admin & Preview) */
+  body:has(#printable-ticket-content) * {
+    visibility: hidden !important;
+  }
+  body:has(#printable-ticket-content) #printable-ticket-content,
+  body:has(#printable-ticket-content) #printable-ticket-content * {
+    visibility: visible !important;
+  }
+  #printable-ticket-content {
+    position: fixed !important;
+    left: 50% !important;
+    top: 20px !important;
+    transform: translateX(-50%) !important;
+    width: 90% !important;
+    max-width: 650px !important;
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    z-index: 99999 !important;
+    background: #ffffff !important;
+    break-inside: avoid !important;
+  }
+
+  /* 3. KASUS KHUSUS: Tanda Terima Pendaftaran Publik (Step 5 Wizard) */
+  body:has(#printable-receipt-content) * {
+    visibility: hidden !important;
+  }
+  body:has(#printable-receipt-content) #printable-receipt-content,
+  body:has(#printable-receipt-content) #printable-receipt-content * {
+    visibility: visible !important;
+  }
+  #printable-receipt-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    z-index: 99999 !important;
+    break-inside: avoid !important;
+  }
+
+  /* 4. KASUS KHUSUS: Halaman Mandiri Cek Tiket Publik */
+  body:has(#printable-public-ticket) * {
+    visibility: hidden !important;
+  }
+  body:has(#printable-public-ticket) #printable-public-ticket,
+  body:has(#printable-public-ticket) #printable-public-ticket * {
+    visibility: visible !important;
+  }
+  #printable-public-ticket {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    z-index: 99999 !important;
+    break-inside: avoid !important;
+  }
+
+  /* 5. KASUS KHUSUS: Rundown Publik */
+  body:has(#printable-rundown) * {
+    visibility: hidden !important;
+  }
+  body:has(#printable-rundown) #printable-rundown,
+  body:has(#printable-rundown) #printable-rundown * {
+    visibility: visible !important;
+  }
+  #printable-rundown {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 24px !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
     z-index: 99999 !important;
   }
 }

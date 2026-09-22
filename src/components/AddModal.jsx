@@ -34,14 +34,20 @@ export default function AddModal({ isOpen, onClose, onAddRegistrant, activeEvent
     e.preventDefault();
     if (!nama || !email || !whatsapp) return;
 
+    const isKomunitas = kategori.includes('Komunitas');
+    const isMabar = kategori.includes('Mabar');
+    const nominal = isKomunitas ? 1000000 : isMabar ? 500000 : 100000;
+    const packageType = isKomunitas ? 'MABAR_11' : isMabar ? 'MABAR_6' : 'INDIVIDU';
+
     onAddRegistrant({
       nama,
       email,
       whatsapp: whatsapp.replace(/^0/, '62'),
       instansi: instansi || 'Individu',
       kategori,
+      packageType,
       bank,
-      nominal: kategori.includes('Mabar') ? 500000 : 100000,
+      nominal,
       statusBayar
     });
 
@@ -130,6 +136,7 @@ export default function AddModal({ isOpen, onClose, onAddRegistrant, activeEvent
               >
                 <option value="Individu (Rp 100.000)">Individu (Rp 100.000)</option>
                 <option value="Promo Mabar (Rp 500.000)">Promo Mabar 6 Pax (Rp 500.000)</option>
+                <option value="Promo Komunitas (Rp 1.000.000)">Promo Komunitas 11 Pax (Rp 1.000.000)</option>
               </select>
             </div>
             <div>

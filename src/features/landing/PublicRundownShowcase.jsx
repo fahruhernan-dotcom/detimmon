@@ -84,7 +84,7 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
 
   return (
     <section id="rundown-acara" className="w-full py-12 px-4 sm:px-6 bg-slate-50/70 border-y border-slate-200">
-      <div className="max-w-5xl mx-auto">
+      <div id="printable-rundown" className="max-w-5xl mx-auto">
         
         {/* Header Seksi */}
         <div className="text-center max-w-3xl mx-auto mb-10">
@@ -223,7 +223,7 @@ export default function PublicRundownShowcase({ eventId, onRegisterClick }) {
         )}
 
         {/* Footer Rundown: Tombol Download & Ajakan Daftar */}
-        <div className="mt-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+        <div className="mt-8 p-6 bg-white rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left no-print print:hidden">
           <div>
             <div className="text-sm font-bold text-slate-900">
               Ingin menyimpan jadwal atau mengajukan izin dinas ke instansi?

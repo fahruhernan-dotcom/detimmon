@@ -101,6 +101,24 @@ export function parseRawNominal(rawInput) {
  */
 export function detectPackageType(nominal, rawCategory = '') {
   const catLower = String(rawCategory).toLowerCase();
+
+  // 1. Promo Komunitas (11 Pax • 10+1)
+  if (
+    catLower.includes('komunitas') || 
+    catLower.includes('10+1') || 
+    catLower.includes('11 orang') || 
+    catLower.includes('11 peserta') || 
+    nominal >= 900000
+  ) {
+    if (nominal === 1000000) {
+      return 'Promo Komunitas 10+1 Free (11 Peserta)';
+    } else if (nominal > 1000000) {
+      return `Promo Komunitas + Kode Unik (${formatRupiah(nominal)})`;
+    }
+    return 'Promo Komunitas 10+1 Free (11 Peserta)';
+  }
+
+  // 2. Promo Mabar (6 Pax • 5+1)
   if (
     catLower.includes('mabar') || 
     catLower.includes('5+1') || 
@@ -115,6 +133,7 @@ export function detectPackageType(nominal, rawCategory = '') {
     }
     return 'Promo Mabar 5+1 Free (6 Peserta)';
   }
+
   if (nominal === 100000) {
     return 'Individu (Rp 100.000)';
   }
@@ -122,9 +141,10 @@ export function detectPackageType(nominal, rawCategory = '') {
 }
 
 /**
- * Generates 6 sub-tickets for Mabar (5+1 Free)
+ * Generates sub-tickets for group packages (6 Pax Mabar or 11 Pax Komunitas)
  */
 export function generateMabarSubTickets(baseTicket, totalPax = 6) {
-  const suffixes = ['A', 'B', 'C', 'D', 'E', 'F'];
+  // Suffix A s/d K (atau s/d Z jika skala besar)
+  const suffixes = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
   return Array.from({ length: totalPax }, (_, i) => `${baseTicket}-${suffixes[i] || (i + 1)}`);
 }

@@ -44,14 +44,39 @@ export default function RegistrantTable({
       if (filter === 'lunas' && item.statusBayar !== 'LUNAS') return false;
 
       if (search.trim()) {
-        const q = search.toLowerCase();
-        return (
-          item.nama.toLowerCase().includes(q) ||
-          item.email.toLowerCase().includes(q) ||
-          item.nomorTicket.toLowerCase().includes(q) ||
-          item.instansi.toLowerCase().includes(q) ||
-          item.whatsapp.includes(q)
-        );
+        const q = search.toLowerCase().trim();
+        const matchesPrimary =
+          (item.nama && item.nama.toLowerCase().includes(q)) ||
+          (item.email && item.email.toLowerCase().includes(q)) ||
+          (item.nomorTicket && item.nomorTicket.toLowerCase().includes(q)) ||
+          (item.instansi && item.instansi.toLowerCase().includes(q)) ||
+          (item.whatsapp && item.whatsapp.includes(q));
+
+        if (matchesPrimary) return true;
+
+        if (Array.isArray(item.registration_members)) {
+          const matchesMember = item.registration_members.some(m => {
+            const p = m.persons || {};
+            const mName = (p.full_name || '').toLowerCase();
+            const mEmail = (p.email || '').toLowerCase();
+            const mPhone = (p.whatsapp || '').toLowerCase();
+            const mSuffix = (m.ticket_suffix || '').toLowerCase();
+            const subTicket = `${item.nomorTicket || ''}-${m.ticket_suffix || ''}`.toLowerCase();
+            return mName.includes(q) || mEmail.includes(q) || mPhone.includes(q) || mSuffix === q || subTicket.includes(q);
+          });
+          if (matchesMember) return true;
+        }
+
+        if (Array.isArray(item.mabarMembers)) {
+          const matchesMabar = item.mabarMembers.some(m => {
+            const mName = (typeof m === 'string' ? m : m?.nama || '').toLowerCase();
+            const mEmail = (typeof m === 'object' ? m?.email || '' : '').toLowerCase();
+            return mName.includes(q) || mEmail.includes(q);
+          });
+          if (matchesMabar) return true;
+        }
+
+        return false;
       }
       return true;
     });
@@ -225,7 +250,8 @@ Sampai jumpa di kelas virtual, Kak!`;
               filteredData.map((item) => {
                 const isLunas = item.statusBayar === 'LUNAS';
                 const isEmailSent = item.statusEmailTicket === 'TERKIRIM';
-                const isMabar = String(item.kategori || '').toLowerCase().includes('mabar') || item.nominal === 500000;
+                const isMabar11 = item.packageType === 'MABAR_11' || item.packageType === 'GROUP_11' || (item.kategori || '').includes('11') || (item.nominal === 1000000);
+                const isMabar6 = item.packageType === 'MABAR_6' || item.packageType === 'GROUP' || (item.kategori || '').toLowerCase().includes('mabar') || (item.nominal === 500000);
                 const isIndividu = String(item.kategori || '').toLowerCase().includes('individu') || item.nominal === 100000;
 
                 return (
@@ -264,11 +290,21 @@ Sampai jumpa di kelas virtual, Kak!`;
                     {/* Column 3: Package & Cost */}
                     <td className="py-3.5 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        {isMabar ? (
+                        {isMabar11 ? (
                           <button
                             type="button"
                             onClick={() => onOpenMembers && onOpenMembers(item)}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition shadow-xs"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition shadow-xs cursor-pointer"
+                            title="Klik untuk lihat 11 anggota rombongan Komunitas (-A s/d -K)"
+                          >
+                            <Users className="w-3 h-3" />
+                            <span>Komunitas (11 Pax)</span>
+                          </button>
+                        ) : isMabar6 ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenMembers && onOpenMembers(item)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition shadow-xs cursor-pointer"
                             title="Klik untuk lihat 6 anggota rombongan MABAR (-A s/d -F)"
                           >
                             <Users className="w-3 h-3" />

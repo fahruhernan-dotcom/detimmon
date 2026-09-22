@@ -378,7 +378,7 @@ export default function DynamicEventLandingPage({ initialSlug }) {
 
             {!isSpeakerConfirmed && (
               <p className="text-[11px] text-stone-400 italic mt-3 text-center md:text-left">
-                * Pengumuman resmi narasumber dirilis via Instagram <a href="https://instagram.com/lpkdignity" target="_blank" rel="noreferrer" className="text-stone-700 underline font-medium">@lpkdignity</a> dan grup koordinasi peserta terdaftar.
+                * Pengumuman resmi narasumber dirilis via Instagram <a href="https://www.instagram.com/indonesiadignity/?hl=en" target="_blank" rel="noreferrer" className="text-stone-700 underline font-medium">@indonesiadignity</a> dan grup koordinasi peserta terdaftar.
               </p>
             )}
           </div>
@@ -601,6 +601,20 @@ export default function DynamicEventLandingPage({ initialSlug }) {
 
           </div>
 
+          {/* Akses Cepat Cek Status Tiket & Pendaftaran */}
+          <div className="mt-10 pt-6 border-t border-stone-200/60 text-center">
+            <p className="text-xs text-stone-600 font-light">
+              Sudah menyelesaikan formulir pendaftaran sebelumnya?{' '}
+              <a
+                href="#/cek-tiket"
+                className="inline-flex items-center gap-1 font-semibold text-[#0A192F] hover:text-[#D4AF37] underline decoration-stone-300 underline-offset-4 transition-colors"
+              >
+                <span>Cek Status Pendaftaran &amp; Tiket Anda di Sini</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
+            </p>
+          </div>
+
         </div>
       </section>
 
@@ -661,6 +675,12 @@ export default function DynamicEventLandingPage({ initialSlug }) {
           <div className="text-xs text-stone-400 flex flex-col items-center md:items-end gap-1 font-light">
             <div>Hotline WhatsApp: <strong className="text-stone-200 font-medium">+62 896-8107-7483</strong></div>
             <div>Email Layanan: <strong className="text-stone-200 font-medium">official@dignityindonesia.id</strong></div>
+            <div>Instagram: <a href="https://www.instagram.com/indonesiadignity/?hl=en" target="_blank" rel="noreferrer" className="text-stone-200 hover:text-[#D4AF37] font-medium transition-colors">@indonesiadignity</a></div>
+            <div className="pt-1">
+              <a href="#/cek-tiket" className="text-stone-300 hover:text-[#D4AF37] font-medium underline underline-offset-2 transition-colors">
+                Portal Cek Status Tiket &amp; Pendaftaran ↗
+              </a>
+            </div>
             <div className="text-[11px] text-stone-500 mt-2 font-mono">
               &copy; 2026 LPK Indonesia Dignity. All rights reserved.
             </div>

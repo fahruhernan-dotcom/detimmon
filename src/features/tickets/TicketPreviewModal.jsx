@@ -192,7 +192,7 @@ export default function TicketPreviewModal({
           )}
 
           {/* Visual Digital Event Pass (The Boarding Pass) */}
-          <div className="relative rounded-3xl border border-slate-200 overflow-hidden shadow-lg bg-gradient-to-br from-white via-slate-50 to-amber-50/30">
+          <div id="printable-ticket-content" className="relative rounded-3xl border border-slate-200 overflow-hidden shadow-lg bg-gradient-to-br from-white via-slate-50 to-amber-50/30">
             {/* Top Pass Header */}
             <div className="p-5 bg-slate-900 text-white flex items-start justify-between gap-4">
               <div>

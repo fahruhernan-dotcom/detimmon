@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { 
   Search, 
   Download, 
@@ -7,52 +7,94 @@ import {
   Filter, 
   CreditCard, 
   ChevronRight, 
+  ChevronDown,
+  ChevronUp,
   Ticket,
   Users,
   Eye,
-  Sparkles,
-  Globe,
   Trash2,
-  RotateCcw
+  RotateCcw,
+  RefreshCw,
+  SlidersHorizontal,
+  Mail,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
-import { formatRupiah, formatDate } from '../../utils/formatters';
+import { formatRupiah, formatDate, generateNextTicketNumber } from '../../utils/formatters';
+import { normalizeCertificateName, normalizeEmail, normalizeWhatsApp } from '../../utils/normalizers';
 import { useConfirm } from '../../context/ConfirmContext';
+import { registrationService } from '../../services/registrationService';
+import { paymentService } from '../../services/paymentService';
+import { emailService } from '../../services/emailService';
+import { sendEmailViaGmail, buildTicketEmailHtml, uploadBackupToDrive } from '../../services/googleApiService';
+
+import GroupRosterAccordion from './components/GroupRosterAccordion';
+import AddModal from '../../components/AddModal';
+import EditRegistrantModal from '../../components/EditRegistrantModal';
+import FastVerifyModal from '../payments/FastVerifyModal';
+import RegistrationMembersModal from './RegistrationMembersModal';
+import ParticipantDetailDrawer from '../../components/ParticipantDetailDrawer';
+import TicketPreviewModal from '../tickets/TicketPreviewModal';
+import EmailPreviewModal from '../communication/EmailPreviewModal';
 
 /**
- * RegistrantsView — Focused registration workspace
- * Per Phase 2: replaces the dense all-in-one table with a crisp, minimal table
- * where row click opens the universal right-side detail drawer.
- * Enhanced: Speed-Queue Fast Verification inline trigger.
+ * RegistrantsView — Autonomous Registration Workspace (Ponytail Architecture)
+ * Fully manages its own modals, CRUD mutations, soft-delete lifecycle,
+ * deep multi-field search, and the group member roster accordion.
  */
 export default function RegistrantsView({
   registrants = [],
-  onSelectParticipant,
-  onOpenFastVerify,
-  onOpenAdd,
-  onExportCsv,
-  onBackupToDrive,
-  onOpenWebSettings,
-  hasGoogleToken,
-  initialFilter = 'all',
-  onRestoreParticipant,
-  onPermanentDeleteParticipant,
-  onEmptyTrash
+  setRegistrants,
+  activeEvent,
+  googleOAuthToken,
+  setGoogleOAuthToken,
+  config = {},
+  currentUser,
+  onRefresh,
+  onNavigateTab,
+  onShowToast,
+  initialFilter = 'all'
 }) {
   const confirm = useConfirm();
+
+  // Internal Filter & Search State
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [packageFilter, setPackageFilter] = useState('all');
+  const [expandedRows, setExpandedRows] = useState({});
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Modals & Active Selections
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [editingRegistrant, setEditingRegistrant] = useState(null);
+  const [activeDrawerParticipant, setActiveDrawerParticipant] = useState(null);
+  const [activeMabarRegistrant, setActiveMabarRegistrant] = useState(null);
+  const [activeTicketPreview, setActiveTicketPreview] = useState(null);
+  const [activeEmailPreview, setActiveEmailPreview] = useState(null);
+  const [fastVerifyParticipantId, setFastVerifyParticipantId] = useState(null);
+  const [isFastVerifyOpen, setIsFastVerifyOpen] = useState(false);
+
+  const toast = useCallback((msg, type = 'info') => {
+    if (onShowToast) onShowToast(msg, type);
+  }, [onShowToast]);
+
+  const toggleExpandRow = (id) => {
+    setExpandedRows(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
 
   const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
   const deletedRegistrants = useMemo(() => registrants.filter(r => r.isDeleted), [registrants]);
 
+  // Deep Multi-Field Matching: matches Buyer, Members, and Sub-Tickets
   const filteredData = useMemo(() => {
     return registrants.filter((item) => {
-      // Trash filter: if trash tab is selected, show only soft-deleted items
+      // Trash filter
       if (statusFilter === 'trash') {
         if (!item.isDeleted) return false;
       } else {
-        // Exclude soft-deleted items from all normal active tabs
         if (item.isDeleted) return false;
       }
 
@@ -63,310 +105,698 @@ export default function RegistrantsView({
 
       // Package filter
       if (packageFilter === 'individu' && !item.kategori?.toLowerCase().includes('individu') && item.nominal !== 100000) return false;
-      if (packageFilter === 'mabar' && !item.kategori?.toLowerCase().includes('mabar') && item.nominal !== 500000) return false;
+      if (packageFilter === 'mabar' && 
+          !item.kategori?.toLowerCase().includes('mabar') && 
+          !item.kategori?.toLowerCase().includes('komunitas') && 
+          item.nominal !== 500000 && 
+          item.nominal !== 1000000 && 
+          item.packageType !== 'MABAR_11' && 
+          item.packageType !== 'MABAR_6') return false;
 
       // Search query
       if (search.trim()) {
-        const q = search.toLowerCase();
-        return (
+        const q = search.toLowerCase().trim();
+        const buyerMatch = (
           item.nama.toLowerCase().includes(q) ||
           item.email.toLowerCase().includes(q) ||
+          (item.whatsapp && item.whatsapp.includes(q)) ||
           (item.nomorTicket && item.nomorTicket.toLowerCase().includes(q)) ||
           (item.instansi && item.instansi.toLowerCase().includes(q)) ||
-          (item.whatsapp && item.whatsapp.includes(q))
+          (item.kota && item.kota.toLowerCase().includes(q))
         );
+        if (buyerMatch) return true;
+
+        // Check group members (mabarMembers / registration_members)
+        const membersList = item.registration_members || item.mabarMembers || [];
+        const memberMatch = membersList.some(m => {
+          const mName = (m.persons?.full_name || m.nama || '').toLowerCase();
+          const mEmail = (m.persons?.email || m.email || '').toLowerCase();
+          const mWa = (m.persons?.whatsapp || m.whatsapp || '');
+          const mSuffix = m.ticket_suffix || m.suffix || '';
+          const mTicket = `${item.nomorTicket || ''}-${mSuffix}`.toLowerCase();
+          return mName.includes(q) || mEmail.includes(q) || mWa.includes(q) || mTicket.includes(q);
+        });
+        if (memberMatch) return true;
+
+        return false;
       }
+
       return true;
     });
   }, [registrants, statusFilter, packageFilter, search]);
 
+  // Counts
+  const pendingCount = useMemo(() => activeRegistrants.filter(r => r.statusBayar === 'PENDING').length, [activeRegistrants]);
+  const lunasCount = useMemo(() => activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length, [activeRegistrants]);
+  const trashCount = useMemo(() => deletedRegistrants.length, [deletedRegistrants]);
+
+  // ── Actions & Handlers ─────────────────────────────────────
+  const handleRefresh = async () => {
+    if (!onRefresh) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleAddRegistrant = async (data) => {
+    if (!activeEvent?.id) {
+      toast('Pilih acara terlebih dahulu sebelum menambah peserta.', 'warning');
+      return;
+    }
+    const cleanNama = normalizeCertificateName(data.nama);
+    const cleanEmail = normalizeEmail(data.email);
+    const cleanWa = normalizeWhatsApp(data.whatsapp);
+    const nominal = parseInt(data.nominal, 10) || 100000;
+    const nextTicket = generateNextTicketNumber(activeRegistrants.length);
+
+    toast(`Menyimpan pendaftar ${cleanNama} ke Supabase...`, 'info');
+    try {
+      const created = await registrationService.createRegistration({
+        eventId: activeEvent.id,
+        personData: {
+          full_name: cleanNama,
+          email: cleanEmail,
+          whatsapp: cleanWa,
+          institution: data.instansi || 'Individu',
+          city: data.kota || '-'
+        },
+        packageType: data.packageType || (data.kategori?.includes('Komunitas') ? 'MABAR_11' : data.kategori?.includes('Mabar') ? 'MABAR_6' : 'INDIVIDU'),
+        isMabar: Boolean(data.kategori?.includes('Komunitas') || data.kategori?.includes('Mabar') || data.packageType?.startsWith('MABAR')),
+        totalDue: nominal,
+        notes: data.catatanCS || 'Diinput manual dari Dashboard'
+      });
+
+      const resolvedPkg = data.packageType || (data.kategori?.includes('Komunitas') ? 'MABAR_11' : data.kategori?.includes('Mabar') ? 'MABAR_6' : 'INDIVIDU');
+      const newEntry = {
+        id: created?.id || Date.now(),
+        supabaseRegistrationId: created?.id,
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        nomorTicket: nextTicket,
+        ...data,
+        packageType: resolvedPkg,
+        nama: cleanNama,
+        email: cleanEmail,
+        whatsapp: cleanWa,
+        instansi: data.instansi || 'Individu',
+        kota: data.kota || '-',
+        nominal,
+        statusBayar: data.statusBayar || 'PENDING',
+        statusEmailTicket: data.statusBayar === 'LUNAS' ? 'TERKIRIM' : 'BELUM'
+      };
+
+      if (setRegistrants) {
+        setRegistrants(prev => [newEntry, ...prev]);
+      }
+      toast(`Pendaftar baru ${cleanNama} berhasil tersimpan di Supabase ✓`, 'success');
+      setIsAddOpen(false);
+    } catch (err) {
+      console.error('Gagal tambah pendaftar ke Supabase:', err);
+      toast(`Gagal menyimpan ke Supabase: ${err.message}`, 'warning');
+    }
+  };
+
+  const handleSaveEditedRegistrant = async (updated) => {
+    const resolvedPackageType = updated.packageType || (
+      updated.kategori?.includes('11') || updated.kategori?.includes('Komunitas') || parseInt(updated.nominal, 10) === 1000000
+        ? 'MABAR_11'
+        : updated.kategori?.includes('Mabar') || parseInt(updated.nominal, 10) === 500000
+        ? 'MABAR_6'
+        : 'INDIVIDU'
+    );
+
+    const cleanUpdated = {
+      ...updated,
+      packageType: resolvedPackageType,
+      nama: normalizeCertificateName(updated.nama),
+      email: normalizeEmail(updated.email),
+      whatsapp: normalizeWhatsApp(updated.whatsapp),
+      nominal: parseInt(updated.nominal, 10) || 100000
+    };
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.map(item => item.id === cleanUpdated.id ? cleanUpdated : item));
+    }
+    toast(`Menyimpan perubahan data ${cleanUpdated.nama} ke Supabase...`, 'info');
+    setEditingRegistrant(null);
+
+    try {
+      if (cleanUpdated.supabaseRegistrationId) {
+        await registrationService.updateRegistration(cleanUpdated.supabaseRegistrationId, {
+          fullName: cleanUpdated.nama,
+          email: cleanUpdated.email,
+          whatsapp: cleanUpdated.whatsapp,
+          institution: cleanUpdated.instansi,
+          city: cleanUpdated.kota,
+          packageType: resolvedPackageType,
+          totalDue: cleanUpdated.nominal,
+          status: cleanUpdated.statusBayar === 'LUNAS' ? 'CONFIRMED' : 'PENDING',
+          mabarMembers: cleanUpdated.mabarMembers
+        });
+        if (onRefresh) onRefresh();
+        toast(`Perubahan data ${cleanUpdated.nama} berhasil tersimpan di Supabase ✓`, 'success');
+      }
+    } catch (err) {
+      console.warn('Gagal update detail di Supabase:', err);
+      toast(`Peringatan Supabase: ${err.message}`, 'warning');
+    }
+  };
+
+  const handleSoftDeleteParticipant = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+    const nowIso = new Date().toISOString();
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.map(item => item.id === id ? { ...item, isDeleted: true, deletedAt: nowIso } : item));
+    }
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(prev => prev ? { ...prev, isDeleted: true, deletedAt: nowIso } : null);
+    }
+
+    try {
+      if (target.supabaseRegistrationId || target.id) {
+        const res = await registrationService.softDeleteRegistration(target.supabaseRegistrationId || target.id);
+        toast(`Pendaftar ${target.nama} dipindahkan ke tempat sampah ✓`, 'success');
+      }
+    } catch (err) {
+      console.warn('Gagal soft delete di Supabase:', err);
+      toast(`Pendaftar ${target.nama} dipindahkan ke tempat sampah lokal`, 'info');
+    }
+  };
+
+  const handleRestoreParticipant = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.map(item => item.id === id ? { ...item, isDeleted: false, deletedAt: null } : item));
+    }
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(prev => prev ? { ...prev, isDeleted: false, deletedAt: null } : null);
+    }
+
+    try {
+      if (target.supabaseRegistrationId || target.id) {
+        await registrationService.restoreRegistration(target.supabaseRegistrationId || target.id);
+        toast(`Pendaftar ${target.nama} berhasil dipulihkan ✓`, 'success');
+      }
+    } catch (err) {
+      console.warn('Gagal restore di Supabase:', err);
+      toast(`Pendaftar ${target.nama} dipulihkan di tampilan lokal`, 'info');
+    }
+  };
+
+  const handlePermanentDeleteParticipant = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.filter(item => item.id !== id));
+    }
+    if (activeDrawerParticipant?.id === id) setActiveDrawerParticipant(null);
+    if (editingRegistrant?.id === id) setEditingRegistrant(null);
+
+    try {
+      const regDbId = target.supabaseRegistrationId || target.id;
+      if (regDbId) {
+        await registrationService.deleteRegistration(regDbId);
+      }
+      toast(`Pendaftar ${target.nama} berhasil dihapus permanen ✓`, 'success');
+    } catch (err) {
+      console.error('Gagal hapus permanen di Supabase:', err);
+      toast(`Gagal menghapus permanen: ${err.message}`, 'error');
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    const trashList = registrants.filter(r => r.isDeleted);
+    if (trashList.length === 0) {
+      toast('Tempat sampah sudah kosong.', 'info');
+      return;
+    }
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.filter(item => !item.isDeleted));
+    }
+    if (activeDrawerParticipant?.isDeleted) setActiveDrawerParticipant(null);
+
+    try {
+      if (activeEvent?.id) {
+        const res = await registrationService.emptyTrash(activeEvent.id);
+        toast(res?.message || `Tempat sampah dikosongkan (${trashList.length} pendaftar dihapus) ✓`, 'success');
+      }
+    } catch (err) {
+      console.error('Gagal mengosongkan tempat sampah:', err);
+      toast(`Gagal mengosongkan tempat sampah: ${err.message}`, 'error');
+    }
+  };
+
+  const handleExportCsv = () => {
+    let csv = 'Timestamp,Nomor_Ticket,Nama_Lengkap,Email,WhatsApp,Instansi,Kategori,Nominal,Bank,Status_Bayar,Status_Email\n';
+    activeRegistrants.forEach(r => {
+      csv += `"${r.timestamp}","${r.nomorTicket}","${r.nama}","${r.email}","${r.whatsapp}","${r.instansi}","${r.kategori}",${r.nominal},"${r.bank}","${r.statusBayar}","${r.statusEmailTicket}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Data_Pendaftar_Webinar_${new Date().toISOString().substring(0, 10)}.csv`;
+    a.click();
+    toast('File CSV pendaftar berhasil diunduh!', 'success');
+  };
+
+  const handleBackupToDrive = async () => {
+    if (!googleOAuthToken) {
+      toast('Silakan login akun Google terlebih dahulu untuk mencadangkan ke Drive.', 'warning');
+      return;
+    }
+    try {
+      toast('Mengunggah data pendaftar ke Google Drive...', 'info');
+      let csv = 'Timestamp,Nomor_Ticket,Nama_Lengkap,Email,WhatsApp,Instansi,Kategori,Nominal,Bank,Status_Bayar,Status_Email\n';
+      activeRegistrants.forEach(r => {
+        csv += `"${r.timestamp}","${r.nomorTicket}","${r.nama}","${r.email}","${r.whatsapp}","${r.instansi}","${r.kategori}",${r.nominal},"${r.bank}","${r.statusBayar}","${r.statusEmailTicket}"\n`;
+      });
+      const fileName = `Backup_Pendaftar_Dignity_${new Date().toISOString().substring(0, 10)}.csv`;
+      const res = await uploadBackupToDrive({
+        accessToken: googleOAuthToken,
+        fileName,
+        content: csv,
+        mimeType: 'text/csv'
+      });
+      toast(`Data berhasil dicadangkan ke Google Drive! (ID: ${res.id})`, 'success');
+    } catch (err) {
+      toast(`Gagal mencadangkan ke Drive: ${err.message}`, 'warning');
+    }
+  };
+
+  // Direct Ticket Email Dispatching for Member Slot
+  const handleResendMemberTicket = async (regId, suffix, memberInfo) => {
+    const target = registrants.find(r => r.id === regId);
+    if (!target) return;
+
+    const recipientEmail = memberInfo.email;
+    const recipientName = memberInfo.nama;
+    const ticketCode = memberInfo.subTicket;
+
+    if (googleOAuthToken) {
+      try {
+        toast(`Mengirim E-Ticket ke ${recipientEmail}...`, 'info');
+        const subject = `[RESMI] E-Ticket & Akses Zoom Webinar Public Speaking LPK Dignity - ${ticketCode}`;
+        const ticketPayload = {
+          ...target,
+          nama: recipientName,
+          email: recipientEmail,
+          nomorTicket: ticketCode
+        };
+        const htmlBody = buildTicketEmailHtml(ticketPayload);
+        const sendRes = await sendEmailViaGmail({
+          accessToken: googleOAuthToken,
+          to: recipientEmail,
+          subject,
+          htmlBody
+        });
+
+        await emailService.recordTicketEmailDispatch({
+          ticketId: target.supabaseTicketId,
+          registrationId: target.supabaseRegistrationId,
+          recipientEmail,
+          subject,
+          providerMessageId: sendRes?.id || null,
+          status: 'SENT',
+          senderEmail: currentUser?.email || null
+        });
+
+        // Update local member sent status
+        if (setRegistrants) {
+          setRegistrants(prev => prev.map(item => {
+            if (item.id === regId) {
+              const updatedMembers = (item.registration_members || []).map(m => {
+                if (m.ticket_suffix === suffix) {
+                  return { ...m, ticket_sent_at: new Date().toISOString() };
+                }
+                return m;
+              });
+              return { ...item, registration_members: updatedMembers };
+            }
+            return item;
+          }));
+        }
+
+        toast(`E-Ticket resmi (${ticketCode}) berhasil dikirim via Gmail ke ${recipientEmail}!`, 'success');
+      } catch (err) {
+        await emailService.recordTicketEmailDispatch({
+          ticketId: target.supabaseTicketId,
+          registrationId: target.supabaseRegistrationId,
+          recipientEmail,
+          subject: `[RESMI] E-Ticket & Akses Zoom Webinar Public Speaking LPK Dignity - ${ticketCode}`,
+          status: 'FAILED',
+          errorMessage: err.message,
+          senderEmail: currentUser?.email || null
+        }).catch(() => {});
+
+        toast(`Gagal kirim via Gmail: ${err.message}`, 'warning');
+      }
+    } else {
+      toast('Silakan login akun Google terlebih dahulu untuk mengirim E-Ticket via Gmail.', 'warning');
+    }
+  };
+
+  const handleVerifyPayment = async (id) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.map(item => item.id === id ? { ...item, statusBayar: 'LUNAS' } : item));
+    }
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(prev => prev ? { ...prev, statusBayar: 'LUNAS' } : null);
+    }
+    toast(`Memverifikasi pembayaran ${target.nama}...`, 'info');
+
+    try {
+      if (target.supabasePaymentId) {
+        await paymentService.verifyPayment(target.supabasePaymentId, 'Diverifikasi via RegistrantsView');
+      }
+      if (target.supabaseRegistrationId) {
+        await registrationService.updateRegistrationStatus(target.supabaseRegistrationId, 'PAID');
+      }
+      toast(`Pembayaran ${target.nama} LUNAS! Tersimpan di Supabase ✓`, 'success');
+    } catch (err) {
+      console.warn('Notice Supabase verifyPayment:', err.message);
+      toast(`Peringatan Supabase: ${err.message}`, 'warning');
+    }
+  };
+
+  const handleRejectPaymentWithReason = async (id, reason) => {
+    const target = registrants.find(r => r.id === id);
+    if (!target) return;
+
+    if (setRegistrants) {
+      setRegistrants(prev => prev.map(item => item.id === id ? { ...item, statusBayar: 'DITOLAK', rejectionReason: reason } : item));
+    }
+    if (activeDrawerParticipant?.id === id) {
+      setActiveDrawerParticipant(prev => prev ? { ...prev, statusBayar: 'DITOLAK', rejectionReason: reason } : null);
+    }
+    toast(`Pembayaran ${target.nama} ditolak: ${reason}`, 'warning');
+
+    try {
+      if (target.supabasePaymentId) {
+        await paymentService.rejectPayment(target.supabasePaymentId, reason);
+      }
+    } catch (err) {
+      console.warn('Notice Supabase rejectPayment:', err);
+    }
+  };
+
   return (
     <div className="space-y-5 animate-fade-in">
       
-      {/* ── TOP ACTIONS & FILTER BAR ────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+      {/* ── TOP CONTROL & FILTER BAR ────────────────────────── */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
         
-        {/* Search input */}
+        {/* Search Input */}
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari nama, email, nomor tiket, atau instansi..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 bg-slate-50/50 placeholder:text-slate-400"
+            placeholder="Cari nama ketua, anggota, email, nomor tiket (TICKET-880-B)..."
+            className="w-full pl-9.5 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400"
           />
         </div>
 
-        {/* Filter Badges & Export Buttons */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* Tab & Filter Chips */}
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Status Tabs */}
-          <div className="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200/80 text-xs">
+          <div className="flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold">
             <button
+              type="button"
               onClick={() => setStatusFilter('all')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
-                statusFilter === 'all' ? 'bg-white text-slate-950 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'all'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
               }`}
             >
               Semua ({activeRegistrants.length})
             </button>
             <button
-              onClick={() => setStatusFilter('lunas')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
-                statusFilter === 'lunas' ? 'bg-white text-emerald-800 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              type="button"
+              onClick={() => setStatusFilter('pending')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'pending'
+                  ? 'bg-amber-500 text-white shadow-2xs font-bold'
+                  : 'text-amber-800 hover:text-amber-950'
               }`}
             >
-              Lunas ({activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length})
+              Pending ({pendingCount})
             </button>
             <button
-              onClick={() => setStatusFilter('pending')}
-              className={`px-3 py-1 rounded-lg font-medium transition-all ${
-                statusFilter === 'pending' ? 'bg-white text-amber-900 font-bold shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+              type="button"
+              onClick={() => setStatusFilter('lunas')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                statusFilter === 'lunas'
+                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                  : 'text-emerald-800 hover:text-emerald-950'
               }`}
             >
-              Pending ({activeRegistrants.filter(r => r.statusBayar === 'PENDING').length})
+              Lunas ({lunasCount})
             </button>
-            {deletedRegistrants.length > 0 && (
-              <button
-                onClick={() => setStatusFilter('trash')}
-                className={`px-3 py-1 rounded-lg font-medium transition-all flex items-center gap-1.5 ${
-                  statusFilter === 'trash' ? 'bg-rose-50 text-rose-800 font-bold shadow-2xs border border-rose-200' : 'text-slate-500 hover:text-rose-700'
-                }`}
-                title="Lihat pendaftar yang berada di tempat sampah"
-              >
-                <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-                <span>Sampah ({deletedRegistrants.length})</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setStatusFilter('trash')}
+              className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1 ${
+                statusFilter === 'trash'
+                  ? 'bg-rose-600 text-white shadow-2xs font-bold'
+                  : 'text-rose-700 hover:text-rose-950'
+              }`}
+              title="Tempat Sampah (Data Terhapus)"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Sampah ({trashCount})</span>
+            </button>
           </div>
 
-          {/* Mode Verifikasi Kilat (Speed Queue CTA) - Selalu Tampil */}
-          {onOpenFastVerify && (
+          {/* Action CTAs */}
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={() => onOpenFastVerify(null)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all duration-200 active:scale-[0.98]"
-              title="Buka Mode Verifikasi Kilat: preview bukti & verifikasi beruntun 1-klik"
+              type="button"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="p-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shadow-2xs disabled:opacity-50"
+              title="Segarkan data dari Supabase"
             >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Verifikasi Kilat {activeRegistrants.filter(r => r.statusBayar === 'PENDING').length > 0 ? `(${activeRegistrants.filter(r => r.statusBayar === 'PENDING').length} Pending)` : ''}</span>
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin text-amber-600' : ''}`} />
             </button>
-          )}
 
-          {/* Quick link to Web Form Settings */}
-          {onOpenWebSettings && (
             <button
-              onClick={onOpenWebSettings}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 shadow-2xs transition-colors"
-              title="Pengaturan Formulir Web Pendaftaran Mandiri"
+              type="button"
+              onClick={handleExportCsv}
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 transition-colors cursor-pointer shadow-2xs"
             >
-              <Globe className="w-3.5 h-3.5 text-amber-600" />
-              <span className="hidden sm:inline">Pengaturan Form Web</span>
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden sm:inline">Ekspor CSV</span>
             </button>
-          )}
 
-          {/* Export CSV */}
-          <button
-            onClick={onExportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-colors"
-            title="Export CSV"
-          >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
-            <span className="hidden sm:inline">CSV</span>
-          </button>
-
-          {/* Backup to Drive */}
-          <button
-            onClick={onBackupToDrive}
-            disabled={!hasGoogleToken}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 shadow-2xs transition-colors disabled:opacity-40"
-            title={hasGoogleToken ? "Backup ke Google Drive" : "Login OAuth dibutuhkan untuk Backup Drive"}
-          >
-            <HardDrive className="w-3.5 h-3.5 text-sky-600" />
-            <span className="hidden sm:inline">Backup Drive</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white transition-all cursor-pointer shadow-2xs active:scale-95"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Tambah Peserta</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Notice Banner jika sedang di tab Sampah */}
-      {statusFilter === 'trash' && (
-        <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-2xs">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-rose-100 flex items-center justify-center shrink-0 text-rose-700">
-              <Trash2 className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="font-bold text-rose-900">
-                Tempat Sampah ({deletedRegistrants.length} Pendaftar)
-              </div>
-              <div className="text-[11px] text-rose-700">
-                Pendaftar di sini tidak aktif. Anda dapat memulihkannya atau menghapusnya secara permanen.
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
-            {deletedRegistrants.length > 0 && onEmptyTrash && (
-              <button
-                type="button"
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: 'Kosongkan Seluruh Tempat Sampah?',
-                    description: `Semua (${deletedRegistrants.length}) pendaftar di tempat sampah akan DIHAPUS PERMANEN dari database beserta tiket dan log pembayarannya.`,
-                    note: 'Tindakan ini tidak dapat dibatalkan (Irreversible).',
-                    variant: 'danger',
-                    confirmText: 'Ya, Kosongkan Semua',
-                    cancelText: 'Batalkan'
-                  });
-                  if (ok) onEmptyTrash();
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs shadow-2xs transition-all active:scale-95 cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Kosongkan Tempat Sampah</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setStatusFilter('all')}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-rose-100/60 border border-rose-200 text-rose-800 font-semibold text-xs transition-colors cursor-pointer"
-            >
-              Kembali ke Aktif
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── CLEAN PARTICIPANT TABLE ─────────────────────────── */}
+      {/* ── MAIN REGISTRANTS TABLE ──────────────────────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-600">
-            <thead className="bg-slate-50 border-b border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-              <tr>
-                <th className="py-3.5 px-4 font-semibold">Peserta</th>
-                <th className="py-3.5 px-4 font-semibold hidden md:table-cell">Instansi & Domisili</th>
-                <th className="py-3.5 px-4 font-semibold">Paket / Tarif</th>
-                <th className="py-3.5 px-4 font-semibold">Status Bayar</th>
-                <th className="py-3.5 px-4 font-semibold">Bukti Bayar</th>
-                <th className="py-3.5 px-4 font-semibold hidden sm:table-cell">E-Ticket</th>
-                <th className="py-3.5 px-4 font-semibold text-right">Aksi</th>
+          <table className="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-500 uppercase tracking-wider font-mono text-[10px]">
+                <th className="py-3 px-4 font-semibold">Peserta / Pembeli</th>
+                <th className="py-3 px-4 font-semibold hidden md:table-cell">Instansi & Domisili</th>
+                <th className="py-3 px-4 font-semibold">Paket & Nominal</th>
+                <th className="py-3 px-4 font-semibold">Status Bayar</th>
+                <th className="py-3 px-4 font-semibold">Bukti Transfer</th>
+                <th className="py-3 px-4 font-semibold hidden sm:table-cell">E-Ticket</th>
+                <th className="py-3 px-4 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredData.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-slate-400">
-                    Tidak ditemukan data pendaftar yang sesuai filter atau pencarian.
+                  <td colSpan={7} className="text-center py-12 text-slate-400">
+                    <div className="flex flex-col items-center gap-2">
+                      <Users className="w-8 h-8 text-slate-300" />
+                      <span className="font-medium text-slate-600">Tidak ada pendaftar ditemukan</span>
+                      <span className="text-[11px] text-slate-400 max-w-xs">
+                        {search ? `Tidak ada hasil pencarian untuk "${search}".` : 'Belum ada pendaftar yang terdaftar di sistem.'}
+                      </span>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 filteredData.map((item) => {
+                  const isExpanded = Boolean(expandedRows[item.id]);
                   const isLunas = item.statusBayar === 'LUNAS';
                   const isPending = item.statusBayar === 'PENDING';
-                  const isMabar = (item.kategori || '').toLowerCase().includes('mabar') || (item.nominal === 500000);
+                  const isMabar11 = item.packageType === 'MABAR_11' || item.packageType === 'GROUP_11' || item.kategori?.includes('11') || item.kategori?.includes('Komunitas') || item.nominal === 1000000;
+                  const isMabar6 = item.packageType === 'MABAR_6' || item.packageType === 'GROUP' || item.kategori?.includes('6') || item.kategori?.includes('Mabar') || item.nominal === 500000;
+                  const isGroup = isMabar11 || isMabar6;
+                  const totalPax = isMabar11 ? 11 : isMabar6 ? 6 : 1;
+
+                  const additionalMembers = item.registration_members || [];
+                  const filledAdditionalMembers = additionalMembers.filter(
+                    m => m.ticket_suffix !== 'A' && m.persons?.full_name && m.persons.full_name.trim().length > 0
+                  );
+                  const filledPaxCount = 1 + filledAdditionalMembers.length;
 
                   return (
-                    <tr
-                      key={item.id}
-                      onClick={() => onSelectParticipant(item)}
-                      className="hover:bg-amber-500/5 transition-colors cursor-pointer group"
-                    >
-                      {/* Name & Email */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-950 group-hover:text-amber-800 transition-colors">
-                          {item.nama}
-                        </div>
-                        <div className="text-[11px] text-slate-400 truncate max-w-[220px]">
-                          {item.email}
-                        </div>
-                      </td>
+                    <React.Fragment key={item.id}>
+                      <tr
+                        onClick={() => setActiveDrawerParticipant(item)}
+                        className={`hover:bg-amber-500/5 transition-colors cursor-pointer group ${isExpanded ? 'bg-amber-500/[0.03]' : ''}`}
+                      >
+                        {/* Name & Email */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-slate-950 group-hover:text-amber-800 transition-colors">
+                            {item.nama}
+                          </div>
+                          <div className="text-[11px] text-slate-400 truncate max-w-[220px]">
+                            {item.email}
+                          </div>
 
-                      {/* Instansi & Domisili */}
-                      <td className="py-3.5 px-4 hidden md:table-cell">
-                        <div className="text-slate-800 font-medium truncate max-w-[180px]">
-                          {item.instansi || '-'}
-                        </div>
-                        <div className="text-[11px] text-slate-400">
-                          {item.domisili || item.kota || 'Surakarta'}
-                        </div>
-                      </td>
-
-                      {/* Paket / Nominal */}
-                      <td className="py-3.5 px-4">
-                        <div className="font-mono font-bold text-slate-900">
-                          {formatRupiah(item.nominal || 0)}
-                        </div>
-                        <div className="text-[10.5px] text-slate-500 flex items-center gap-1 flex-wrap mt-0.5">
-                          {isMabar ? (
-                            <span className="text-indigo-600 font-semibold flex items-center gap-0.5">
-                              <Users className="w-3 h-3" /> MABAR (6 Pax)
-                            </span>
-                          ) : (
-                            <span>Individu</span>
-                          )}
-                          {/* Badge Voucher Rebate */}
-                          {(item.kategori || '').toLowerCase().includes('rebate') || (item.nomorTicket || '').toLowerCase().includes('voucher') ? (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[9px] uppercase tracking-wide">
-                              🏷️ Rebate
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-
-                      {/* Status Bayar */}
-                      <td className="py-3.5 px-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono border ${
-                          isLunas 
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                            : isPending
-                            ? 'bg-amber-50 text-amber-900 border-amber-200'
-                            : 'bg-rose-50 text-rose-800 border-rose-200'
-                        }`}>
-                          {item.statusBayar}
-                        </span>
-                      </td>
-
-                      {/* Bukti Transfer / Pratinjau Cepat */}
-                      <td className="py-3.5 px-4">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (onOpenFastVerify) onOpenFastVerify(item.id);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all hover:scale-[1.02] active:scale-[0.98] ${
-                            isPending 
-                              ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-950 font-bold shadow-2xs' 
-                              : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs'
-                          }`}
-                          title="Pratinjau bukti transfer & mode verifikasi kilat"
-                        >
-                          <Eye className={`w-3.5 h-3.5 ${isPending ? 'text-amber-700' : 'text-slate-500'}`} />
-                          <span>{isPending ? 'Cek & Verif' : 'Lihat Bukti'}</span>
-                        </button>
-                      </td>
-
-                      {/* E-Ticket */}
-                      <td className="py-3.5 px-4 hidden sm:table-cell font-mono text-[11px]">
-                        <div className="text-slate-700">{item.nomorTicket || '-'}</div>
-                        <div className={`text-[10px] ${item.statusEmailTicket === 'TERKIRIM' ? 'text-emerald-600' : 'text-slate-400'}`}>
-                          {item.statusEmailTicket === 'TERKIRIM' ? '✓ Terkirim' : 'Belum kirim'}
-                        </div>
-                      </td>
-
-                      {/* Action Column */}
-                      <td className="py-3.5 px-4 text-right">
-                        {item.isDeleted ? (
-                          <div className="inline-flex items-center gap-1.5 justify-end" onClick={(e) => e.stopPropagation()}>
-                            {onRestoreParticipant && (
+                          {/* Group & Member Badges */}
+                          {isGroup && (
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                               <button
                                 type="button"
-                                onClick={() => onRestoreParticipant(item.id)}
+                                onClick={() => setActiveMabarRegistrant(item)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all cursor-pointer active:scale-95"
+                                title="Buka modal kelola anggota rombongan"
+                              >
+                                <Users className="w-3 h-3 text-indigo-600" />
+                                <span>{filledPaxCount}/{totalPax} Terisi</span>
+                              </button>
+
+                              {/* Member Pills Preview */}
+                              {filledAdditionalMembers.map((m) => (
+                                <span 
+                                  key={m.id || m.ticket_suffix}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-50 text-amber-900 border border-amber-200/80 font-medium"
+                                  title={`Slot ${m.ticket_suffix}: ${m.persons?.full_name} (${m.persons?.email || '-'})`}
+                                >
+                                  <span className="font-bold text-amber-600">[{m.ticket_suffix}]</span>
+                                  <span className="truncate max-w-[100px]">{m.persons?.full_name}</span>
+                                </span>
+                              ))}
+
+                              {/* Quick toggle accordion */}
+                              <button
+                                type="button"
+                                onClick={() => toggleExpandRow(item.id)}
+                                className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 hover:text-indigo-600 font-semibold px-1 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
+                                title={isExpanded ? "Tutup rincian roster" : "Buka rincian slot tiket"}
+                              >
+                                <span>{isExpanded ? 'Tutup Roster' : 'Lihat Slot'}</span>
+                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Instansi & Domisili */}
+                        <td className="py-3.5 px-4 hidden md:table-cell">
+                          <div className="text-slate-800 font-medium truncate max-w-[180px]">
+                            {item.instansi || '-'}
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            {item.domisili || item.kota || 'Surakarta'}
+                          </div>
+                        </td>
+
+                        {/* Paket / Nominal */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-mono font-bold text-slate-900">
+                            {formatRupiah(item.nominal || 0)}
+                          </div>
+                          <div className="text-[10.5px] text-slate-500 flex items-center gap-1 flex-wrap mt-0.5">
+                            {isMabar11 ? (
+                              <span className="text-indigo-600 font-semibold flex items-center gap-0.5 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
+                                <Users className="w-3 h-3" /> Komunitas (11 Pax)
+                              </span>
+                            ) : isMabar6 ? (
+                              <span className="text-indigo-600 font-semibold flex items-center gap-0.5 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
+                                <Users className="w-3 h-3" /> MABAR (6 Pax)
+                              </span>
+                            ) : (
+                              <span>Individu</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Status Bayar */}
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono border ${
+                            isLunas 
+                              ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                              : isPending
+                              ? 'bg-amber-50 text-amber-900 border-amber-200'
+                              : 'bg-rose-50 text-rose-800 border-rose-200'
+                          }`}>
+                            {item.statusBayar}
+                          </span>
+                        </td>
+
+                        {/* Bukti Transfer / Pratinjau Cepat */}
+                        <td className="py-3.5 px-4">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFastVerifyParticipantId(item.id);
+                              setIsFastVerifyOpen(true);
+                            }}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+                              isPending 
+                                ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-950 font-bold shadow-2xs' 
+                                : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs'
+                            }`}
+                            title="Pratinjau bukti transfer & verifikasi kilat"
+                          >
+                            <Eye className={`w-3.5 h-3.5 ${isPending ? 'text-amber-700' : 'text-slate-500'}`} />
+                            <span>{isPending ? 'Cek & Verif' : 'Lihat Bukti'}</span>
+                          </button>
+                        </td>
+
+                        {/* E-Ticket */}
+                        <td className="py-3.5 px-4 hidden sm:table-cell font-mono text-[11px]">
+                          <div className="text-slate-700">{item.nomorTicket || '-'}</div>
+                          <div className={`text-[10px] ${item.statusEmailTicket === 'TERKIRIM' ? 'text-emerald-600' : 'text-slate-400'}`}>
+                            {item.statusEmailTicket === 'TERKIRIM' ? '✓ Terkirim' : 'Belum kirim'}
+                          </div>
+                        </td>
+
+                        {/* Action Column */}
+                        <td className="py-3.5 px-4 text-right">
+                          {item.isDeleted ? (
+                            <div className="inline-flex items-center gap-1.5 justify-end" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreParticipant(item.id)}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer active:scale-95"
                                 title="Pulihkan pendaftar ke daftar aktif"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 <span>Pulihkan</span>
                               </button>
-                            )}
-                            {onPermanentDeleteParticipant && (
                               <button
                                 type="button"
                                 onClick={async () => {
@@ -378,7 +808,7 @@ export default function RegistrantsView({
                                     confirmText: 'Hapus Permanen',
                                     cancelText: 'Batalkan'
                                   });
-                                  if (ok) onPermanentDeleteParticipant(item.id);
+                                  if (ok) handlePermanentDeleteParticipant(item.id);
                                 }}
                                 className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-bold transition-colors shadow-2xs cursor-pointer active:scale-95"
                                 title="Hapus permanen dari database"
@@ -386,24 +816,34 @@ export default function RegistrantsView({
                                 <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                                 <span>Hapus Permanen</span>
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => onSelectParticipant && onSelectParticipant(item)}
-                              className="p-1 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-                              title="Lihat Detail"
-                            >
+                            </div>
+                          ) : (
+                            <div className="inline-flex items-center gap-1 text-slate-400 group-hover:text-amber-700 transition-colors text-xs font-medium">
+                              <span className="hidden lg:inline">Detail</span>
                               <ChevronRight className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1 text-slate-400 group-hover:text-amber-700 transition-colors text-xs font-medium">
-                            <span className="hidden lg:inline">Detail</span>
-                            <ChevronRight className="w-4 h-4" />
-                          </div>
-                        )}
-                      </td>
-                    </tr>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+
+                      {/* ── EXPANDABLE GROUP ROSTER ACCORDION ROW ── */}
+                      {isGroup && isExpanded && (
+                        <tr className="bg-slate-50/70 border-b border-slate-200/80" onClick={(e) => e.stopPropagation()}>
+                          <td colSpan={7} className="p-4 pl-6 md:pl-10">
+                            <GroupRosterAccordion
+                              item={item}
+                              activeEvent={activeEvent}
+                              googleOAuthToken={googleOAuthToken}
+                              onResendMemberTicket={handleResendMemberTicket}
+                              onOpenTicketPreview={(p) => setActiveTicketPreview(p)}
+                              onOpenEmailPreview={(p) => setActiveEmailPreview(p)}
+                              onOpenMembersModal={(p) => setActiveMabarRegistrant(p)}
+                              onShowToast={toast}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}
@@ -411,13 +851,128 @@ export default function RegistrantsView({
           </table>
         </div>
 
-        {/* Footer Count */}
-        <div className="p-4 bg-slate-50/70 border-t border-slate-200/80 flex items-center justify-between text-xs text-slate-500">
-          <span>Menampilkan <strong>{filteredData.length}</strong> dari <strong>{statusFilter === 'trash' ? deletedRegistrants.length : activeRegistrants.length}</strong> peserta {statusFilter === 'trash' ? '(Tempat Sampah)' : ''}</span>
-          <span className="text-[11px] text-slate-400">Klik baris peserta untuk membuka panel detail di sebelah kanan</span>
+        {/* Footer Count & Trash Actions */}
+        <div className="p-4 bg-slate-50/70 border-t border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-500">
+          <span>
+            Menampilkan <strong>{filteredData.length}</strong> dari <strong>{statusFilter === 'trash' ? deletedRegistrants.length : activeRegistrants.length}</strong> peserta {statusFilter === 'trash' ? '(Tempat Sampah)' : ''}
+          </span>
+          {statusFilter === 'trash' && deletedRegistrants.length > 0 && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: 'Kosongkan Tempat Sampah?',
+                  description: `Semua (${deletedRegistrants.length}) pendaftar di tempat sampah akan dihapus permanen dari database.`,
+                  variant: 'danger',
+                  confirmText: 'Kosongkan Sekarang',
+                  cancelText: 'Batalkan'
+                });
+                if (ok) handleEmptyTrash();
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-2xs transition-colors cursor-pointer"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Kosongkan Tempat Sampah</span>
+            </button>
+          )}
         </div>
       </div>
 
+      {/* ── CO-LOCATED MODALS ───────────────────────────────── */}
+      <AddModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        onAddRegistrant={handleAddRegistrant}
+        activeEventId={activeEvent?.id}
+      />
+
+      <EditRegistrantModal
+        isOpen={Boolean(editingRegistrant)}
+        registrant={editingRegistrant}
+        onClose={() => setEditingRegistrant(null)}
+        onSave={handleSaveEditedRegistrant}
+        onDelete={handleSoftDeleteParticipant}
+        onRestore={handleRestoreParticipant}
+        onPermanentDelete={handlePermanentDeleteParticipant}
+      />
+
+      <RegistrationMembersModal
+        isOpen={Boolean(activeMabarRegistrant)}
+        onClose={() => setActiveMabarRegistrant(null)}
+        registrant={activeMabarRegistrant}
+        onOpenTicketPreview={(item, suffix) => {
+          setActiveTicketPreview({ ...item, selectedSuffix: suffix });
+        }}
+        onEdit={(item) => {
+          setActiveMabarRegistrant(null);
+          setEditingRegistrant(item);
+        }}
+      />
+
+      <TicketPreviewModal
+        isOpen={Boolean(activeTicketPreview)}
+        onClose={() => setActiveTicketPreview(null)}
+        registrant={activeTicketPreview}
+        activeEvent={activeEvent}
+      />
+
+      <EmailPreviewModal
+        isOpen={Boolean(activeEmailPreview)}
+        onClose={() => setActiveEmailPreview(null)}
+        registrant={activeEmailPreview}
+        type="ticket"
+        activeEvent={activeEvent}
+        googleOAuthToken={googleOAuthToken}
+        onEmailSent={(p) => {
+          toast(`E-Ticket resmi telah dikirim ke ${p.email}!`, 'success');
+        }}
+      />
+
+      <FastVerifyModal
+        isOpen={isFastVerifyOpen}
+        onClose={() => {
+          setIsFastVerifyOpen(false);
+          setFastVerifyParticipantId(null);
+        }}
+        allRegistrants={activeRegistrants}
+        pendingRegistrants={activeRegistrants.filter(r => r.statusBayar === 'PENDING')}
+        initialParticipantId={fastVerifyParticipantId}
+        onVerifyPayment={handleVerifyPayment}
+        onRejectPaymentWithReason={handleRejectPaymentWithReason}
+        googleOAuthToken={googleOAuthToken}
+        clientId={config.clientId}
+        onPreviewEmail={(p) => setActiveEmailPreview(p)}
+        activeEvent={activeEvent}
+      />
+
+      <ParticipantDetailDrawer
+        isOpen={Boolean(activeDrawerParticipant) && !Boolean(editingRegistrant)}
+        onClose={() => setActiveDrawerParticipant(null)}
+        participant={activeDrawerParticipant}
+        onVerifyPayment={handleVerifyPayment}
+        onRejectPayment={(p) => handleRejectPaymentWithReason(p.id, 'Bukti Buram / Tidak Terbaca')}
+        onResendTicket={(id) => handleResendMemberTicket(id, 'A', {
+          nama: activeDrawerParticipant?.nama,
+          email: activeDrawerParticipant?.email,
+          subTicket: activeDrawerParticipant?.nomorTicket
+        })}
+        onOpenTicketPreview={(p) => {
+          setActiveDrawerParticipant(null);
+          setActiveTicketPreview(p);
+        }}
+        onOpenMembers={(p) => {
+          setActiveDrawerParticipant(null);
+          setActiveMabarRegistrant(p);
+        }}
+        onEditParticipant={(p) => {
+          setActiveDrawerParticipant(null);
+          setEditingRegistrant(p);
+        }}
+        onSoftDelete={handleSoftDeleteParticipant}
+        onRestore={handleRestoreParticipant}
+        onPermanentDelete={handlePermanentDeleteParticipant}
+        hasGoogleToken={Boolean(googleOAuthToken)}
+      />
     </div>
   );
 }

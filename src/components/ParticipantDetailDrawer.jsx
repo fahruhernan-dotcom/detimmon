@@ -62,6 +62,7 @@ export default function ParticipantDetailDrawer({
   const confirm = useConfirm();
   const [internalNote, setInternalNote] = useState('');
   const [isCopied, setIsCopied] = useState(false);
+  const [isCopiedLink, setIsCopiedLink] = useState(false);
   const [isSavingNote, setIsSavingNote] = useState(false);
 
   useEffect(() => {
@@ -91,6 +92,16 @@ export default function ParticipantDetailDrawer({
     }
   };
 
+  const handleCopySelfServiceLink = () => {
+    if (participant.nomorTicket) {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:8080';
+      const url = `${origin}/#/cek-tiket?code=${encodeURIComponent(participant.nomorTicket)}`;
+      navigator.clipboard.writeText(url);
+      setIsCopiedLink(true);
+      setTimeout(() => setIsCopiedLink(false), 2000);
+    }
+  };
+
   const handleSaveNotes = () => {
     setIsSavingNote(true);
     if (onUpdateNotes) {
@@ -103,8 +114,17 @@ export default function ParticipantDetailDrawer({
   const isPending = participant.statusBayar === 'PENDING';
   const isRejected = participant.statusBayar === 'DITOLAK' || participant.statusBayar === 'REJECTED';
   const isTicketSent = participant.statusEmailTicket === 'TERKIRIM';
-  const isMabar = (participant.kategori || '').toLowerCase().includes('mabar') || 
-                  (participant.nominal === 500000);
+  
+  // Group & Community Detection
+  const isMabar11 = participant.packageType === 'MABAR_11' || participant.packageType === 'GROUP_11' || (participant.kategori || '').includes('11') || (participant.nominal === 1000000);
+  const isMabar6 = participant.packageType === 'MABAR_6' || participant.packageType === 'GROUP' || (participant.kategori || '').toLowerCase().includes('mabar') || (participant.nominal === 500000);
+  const isGroup = isMabar11 || isMabar6 || (Array.isArray(participant.registration_members) && participant.registration_members.length > 0);
+  const totalPax = isMabar11 ? 11 : isMabar6 ? 6 : (participant.registration_members?.length || 1);
+
+  const regMembers = Array.isArray(participant.registration_members) ? participant.registration_members : [];
+  const additionalMembers = regMembers.filter(m => m.ticket_suffix !== 'A' && m.member_role !== 'LEADER');
+  const filledAdditionalMembers = additionalMembers.filter(m => Boolean(m.persons?.full_name && m.persons.full_name.trim().length > 0));
+  const filledPaxCount = 1 + filledAdditionalMembers.length;
 
   const cleanPhone = (participant.whatsapp || '').replace(/[^0-9]/g, '');
   const formattedPhone = cleanPhone.startsWith('0') ? `62${cleanPhone.slice(1)}` : cleanPhone;
@@ -178,6 +198,7 @@ export default function ParticipantDetailDrawer({
             ) : (
               <button
                 onClick={() => {
+                  onClose();
                   if (onEditParticipant) onEditParticipant(participant);
                 }}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-amber-700 transition-colors cursor-pointer"
@@ -189,7 +210,10 @@ export default function ParticipantDetailDrawer({
 
             {isMabar && onOpenMembers && (
               <button
-                onClick={() => onOpenMembers(participant)}
+                onClick={() => {
+                  onClose();
+                  onOpenMembers(participant);
+                }}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
               >
                 <Users className="w-3.5 h-3.5" />
@@ -319,7 +343,10 @@ export default function ParticipantDetailDrawer({
 
             {onOpenProfile360 && (
               <button
-                onClick={() => onOpenProfile360(participant)}
+                onClick={() => {
+                  onClose();
+                  onOpenProfile360(participant);
+                }}
                 className="w-full mt-2.5 py-2 px-3 rounded-xl border border-amber-300 bg-amber-50/70 hover:bg-amber-100/70 text-amber-950 font-bold text-xs flex items-center justify-between transition-all shadow-2xs group"
               >
                 <div className="flex items-center gap-2">
@@ -473,9 +500,121 @@ export default function ParticipantDetailDrawer({
                   <span className="text-[11px] text-slate-400 font-mono">Buka &rarr;</span>
                 </button>
               )}
+
+              {/* Group Roster Modal Button */}
+              {isGroup && onOpenMembers && (
+                <button
+                  onClick={() => onOpenMembers(participant)}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 font-semibold text-xs transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4 text-indigo-600" />
+                    <span>Kelola Roster Anggota ({filledPaxCount}/{totalPax} Terisi)</span>
+                  </div>
+                  <span className="text-[11px] text-indigo-600 font-mono">Buka &rarr;</span>
+                </button>
+              )}
             </div>
           )}
           </section>
+
+          {/* ── SECTION: GROUP MEMBERS ROSTER PREVIEW ────────── */}
+          {isGroup && (
+            <section>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Daftar Anggota Rombongan ({filledPaxCount}/{totalPax})</span>
+                </h3>
+                {onOpenMembers && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenMembers(participant)}
+                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                  >
+                    Kelola Lengkap &rarr;
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-slate-50/90 rounded-2xl p-3 border border-slate-200/80 space-y-2">
+                {/* Slots preview */}
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1 divide-y divide-slate-100">
+                  {Array.from({ length: totalPax }).map((_, idx) => {
+                    const suffix = String.fromCharCode(65 + idx);
+                    const isLeader = idx === 0;
+                    const subTicket = `${participant.nomorTicket || 'TICKET'}-${suffix}`;
+
+                    let slotName = '';
+                    let slotEmail = '';
+                    let isFilled = false;
+
+                    if (isLeader) {
+                      slotName = `${participant.nama} (Ketua)`;
+                      slotEmail = participant.email;
+                      isFilled = true;
+                    } else {
+                      const m = additionalMembers.find(member => member.ticket_suffix === suffix);
+                      if (m?.persons?.full_name && m.persons.full_name.trim().length > 0) {
+                        slotName = m.persons.full_name;
+                        slotEmail = m.persons.email || '-';
+                        isFilled = true;
+                      } else {
+                        slotName = '(Data Belum Diisi • Menyusul)';
+                        isFilled = false;
+                      }
+                    }
+
+                    return (
+                      <div key={suffix} className="pt-1.5 first:pt-0 flex items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className={`w-5 h-5 rounded-md flex items-center justify-center font-mono font-bold text-[10px] shrink-0 ${
+                            isLeader ? 'bg-amber-500 text-white' : isFilled ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'
+                          }`}>
+                            {suffix}
+                          </span>
+                          <div className="min-w-0">
+                            <div className={`truncate text-xs ${isFilled ? 'font-semibold text-slate-900' : 'text-slate-400 italic'}`}>
+                              {slotName}
+                            </div>
+                            {isFilled && slotEmail && slotEmail !== '-' && (
+                              <div className="text-[10px] text-slate-400 font-mono truncate">{slotEmail}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <div className="font-mono text-[10px] text-slate-600">{subTicket}</div>
+                          <span className={`text-[9px] font-bold ${isFilled ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {isFilled ? '✓ Terdaftar' : 'Belum Diisi'}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Self-service sharing button */}
+                <button
+                  type="button"
+                  onClick={handleCopySelfServiceLink}
+                  className="w-full mt-2 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+                  title="Salin tautan formulir pengisian mandiri untuk dikirim via WhatsApp"
+                >
+                  {isCopiedLink ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-700">Tautan Berhasil Disalin!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Salin Link Pengisian Mandiri</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </section>
+          )}
 
           {/* ── SECTION 4: RELATED RECORDS ──────────────────── */}
           <section>

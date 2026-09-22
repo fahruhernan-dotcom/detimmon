@@ -25,6 +25,7 @@ import { normalizeCertificateName } from '../../utils/normalizers';
 import { formatDate } from '../../utils/formatters';
 import { certificateService } from '../../services/certificateService';
 import { useEvent } from '../../context/EventContext';
+import CertificateModal from '../../components/CertificateModal';
 
 /**
  * CertificatesView — Dedicated operational workspace for Certificate lifecycle
@@ -52,6 +53,7 @@ export default function CertificatesView({
   const [isIssuingBatch, setIsIssuingBatch] = useState(false);
   const [isSendingBatch, setIsSendingBatch] = useState(false);
   const [copiedCode, setCopiedCode] = useState(null);
+  const [activeCert, setActiveCert] = useState(null);
 
   // ── 1. Map & Standardize Unique Certificate Items ──────────
   const certItems = useMemo(() => {
@@ -580,9 +582,12 @@ export default function CertificatesView({
                         <div className="inline-flex items-center gap-1">
                           {/* Preview Modal Button */}
                           <button
-                            onClick={() => onPreviewCert && onPreviewCert(item)}
+                            onClick={() => {
+                              setActiveCert(item);
+                              if (onPreviewCert) onPreviewCert(item);
+                            }}
                             title="Pratinjau Desain E-Sertifikat Resmi"
-                            className="p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1"
+                            className="p-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-1 cursor-pointer"
                           >
                             <Eye className="w-3.5 h-3.5" />
                           </button>
@@ -634,6 +639,12 @@ export default function CertificatesView({
         </div>
       </div>
 
+      <CertificateModal
+        isOpen={Boolean(activeCert)}
+        onClose={() => setActiveCert(null)}
+        certData={activeCert}
+        selectedSpeaker={selectedSpeaker}
+      />
     </div>
   );
 }

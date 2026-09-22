@@ -16,6 +16,7 @@ import {
   ArrowUpCircle
 } from 'lucide-react';
 import { paymentService } from '../../services/paymentService';
+import { registrationService } from '../../services/registrationService';
 import { paymentAccountService } from '../../services/paymentAccountService';
 import { formatRupiah, formatDate } from '../../utils/formatters';
 
@@ -121,6 +122,7 @@ export default function PaymentLedgerModal({
     try {
       if (registrant.supabaseRegistrationId && !paymentId.startsWith('mock-')) {
         await paymentService.verifyPayment(paymentId, 'Diverifikasi manual oleh Finance');
+        await registrationService.updateRegistrationStatus(registrant.supabaseRegistrationId, 'PAID');
       }
       onPaymentUpdated?.(registrant.id, 'LUNAS');
       await loadLedgerData();
@@ -139,6 +141,7 @@ export default function PaymentLedgerModal({
     try {
       if (registrant.supabaseRegistrationId && !paymentId.startsWith('mock-')) {
         await paymentService.rejectPayment(paymentId, reason);
+        await registrationService.updateRegistrationStatus(registrant.supabaseRegistrationId, 'PENDING_PAYMENT');
       }
       onPaymentUpdated?.(registrant.id, 'PENDING');
       await loadLedgerData();

@@ -274,3 +274,34 @@ export function normalizeWhatsApp(rawPhone) {
   }
   return digits;
 }
+
+/**
+ * Masks an email for privacy compliance (UU PDP)
+ * Example: fahruhernansakti@gmail.com -> f***i@gmail.com
+ */
+export function maskEmail(email) {
+  if (!email || typeof email !== 'string' || !email.includes('@')) return '-';
+  const [localPart, domain] = email.split('@');
+  if (localPart.length <= 2) {
+    return `${localPart[0]}***@${domain}`;
+  }
+  return `${localPart[0]}***${localPart[localPart.length - 1]}@${domain}`;
+}
+
+/**
+ * Masks a phone number for privacy compliance
+ * Example: 6282133859391 -> 0821-****-9391
+ */
+export function maskWhatsApp(phone) {
+  if (!phone) return '-';
+  const clean = String(phone).replace(/[^0-9]/g, '');
+  if (clean.length < 8) return '****';
+  const localFormat = clean.startsWith('62') ? '0' + clean.slice(2) : clean;
+  if (localFormat.length >= 10) {
+    const prefix = localFormat.slice(0, 4);
+    const suffix = localFormat.slice(-4);
+    return `${prefix}-****-${suffix}`;
+  }
+  return `${localFormat.slice(0, 3)}****${localFormat.slice(-2)}`;
+}
+

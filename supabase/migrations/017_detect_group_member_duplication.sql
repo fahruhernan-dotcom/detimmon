@@ -9,20 +9,30 @@
 -- 3. Mencegah koordinator mendaftarkan orang yang sudah terdaftar di rombongan lain (cross-group conflict).
 -- ==============================================================================
 
+-- Bersihkan SEMUA overloaded signatures lama agar tidak ambigu
+DROP FUNCTION IF EXISTS public.submit_web_registration(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, TEXT, TEXT, TEXT, JSONB, TEXT);
+DROP FUNCTION IF EXISTS public.submit_web_registration(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, TEXT, TEXT, TEXT, JSONB);
+DROP FUNCTION IF EXISTS public.submit_web_registration(UUID, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, NUMERIC, NUMERIC, TEXT, TEXT, TEXT, JSONB, TEXT, TEXT, NUMERIC, TEXT);
+
 CREATE OR REPLACE FUNCTION public.submit_web_registration(
   p_event_id UUID,
-  p_nama TEXT,
-  p_email TEXT,
-  p_whatsapp TEXT,
-  p_institution TEXT,
-  p_city TEXT,
-  p_package_type TEXT,
-  p_gross_amount NUMERIC,
-  p_net_amount NUMERIC,
+  p_nama TEXT DEFAULT NULL,
+  p_email TEXT DEFAULT NULL,
+  p_whatsapp TEXT DEFAULT NULL,
+  p_institution TEXT DEFAULT NULL,
+  p_city TEXT DEFAULT NULL,
+  p_package_type TEXT DEFAULT 'INDIVIDU',
+  p_gross_amount NUMERIC DEFAULT NULL,
+  p_net_amount NUMERIC DEFAULT NULL,
   p_voucher_code TEXT DEFAULT NULL,
   p_proof_data TEXT DEFAULT NULL,
   p_notes TEXT DEFAULT NULL,
-  p_mabar_members JSONB DEFAULT '[]'::JSONB
+  p_mabar_members JSONB DEFAULT '[]'::JSONB,
+  -- Backward-compatibility aliases
+  p_full_name TEXT DEFAULT NULL,
+  p_job_title TEXT DEFAULT NULL,
+  p_total_due NUMERIC DEFAULT NULL,
+  p_bank_destination TEXT DEFAULT 'Bank Mandiri'
 )
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -30,6 +40,7 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
+  v_resolved_nama TEXT;
   v_person_id UUID;
   v_new_reg_id UUID;
   v_ticket_no TEXT;
@@ -51,6 +62,11 @@ DECLARE
   v_existing_ticket TEXT;
   v_existing_member RECORD;
 BEGIN
+  -- 0. RESOLUSI PARAMETER NAMA & NOMINAL
+  v_resolved_nama := COALESCE(NULLIF(TRIM(p_nama), ''), NULLIF(TRIM(p_full_name), ''));
+  v_gross_amount  := COALESCE(p_gross_amount, p_total_due, 100000);
+  v_net_amount    := COALESCE(p_net_amount, p_total_due, v_gross_amount);
+
   -- 1. VALIDASI EVENT
   SELECT * INTO v_event FROM public.events WHERE id = p_event_id;
   IF NOT FOUND THEN
@@ -80,7 +96,7 @@ BEGIN
     INSERT INTO public.persons (
       full_name, email, whatsapp, institution, city
     ) VALUES (
-      TRIM(p_nama),
+      TRIM(v_resolved_nama),
       v_clean_email,
       v_clean_phone,
       COALESCE(NULLIF(TRIM(p_institution), ''), '-'),
@@ -89,7 +105,7 @@ BEGIN
   ELSE
     UPDATE public.persons
     SET
-      full_name = TRIM(p_nama),
+      full_name = TRIM(v_resolved_nama),
       email = v_clean_email,
       whatsapp = v_clean_phone,
       institution = COALESCE(NULLIF(TRIM(p_institution), ''), institution),
@@ -129,7 +145,7 @@ BEGIN
       'leader_whatsapp', v_existing_member.leader_whatsapp,
       'parent_package',  v_existing_member.parent_package_type,
       'parent_status',   v_existing_member.parent_status,
-      'status',          CASE WHEN v_existing_member.parent_status IN ('CONFIRMED', 'ATTENDED') THEN 'PAID' ELSE 'PENDING' END,
+      'status',          CASE WHEN v_existing_member.parent_status::text IN ('PAID', 'CONFIRMED', 'ATTENDED') THEN 'PAID' ELSE 'PENDING' END,
       'ticket_number',   COALESCE(v_existing_member.member_ticket_code, 'ANGGOTA-ROMBONGAN-' || UPPER(SUBSTRING(v_existing_member.parent_reg_id::TEXT FROM 1 FOR 6)) || '-' || v_existing_member.ticket_suffix),
       'message',         'Kabar baik! Anda telah didaftarkan oleh ' || v_existing_member.leader_name || ' pada paket rombongan ' || v_existing_member.parent_package_type || '. Anda tidak perlu melakukan pembayaran mandiri lagi.',
       'wa_group_url',    COALESCE(v_event.web_registration_config->>'wa_group_url', '')
@@ -137,8 +153,8 @@ BEGIN
   END IF;
 
   -- 5. HITUNG NOMINAL & VOUCHER
-  v_gross_amount := COALESCE(p_gross_amount, 100000);
-  v_net_amount   := COALESCE(p_net_amount, v_gross_amount);
+  v_gross_amount := COALESCE(v_gross_amount, 100000);
+  v_net_amount   := COALESCE(v_net_amount, v_gross_amount);
 
   IF v_voucher_code_up != '' THEN
     SELECT id, discount_amount INTO v_voucher_id, v_discount
@@ -206,6 +222,8 @@ BEGIN
       'status', 'PENDING',
       'registration_id', v_trash_reg.id,
       'ticket_number', COALESCE(v_existing_ticket, 'REG-DIGNITY-' || UPPER(SUBSTRING(v_trash_reg.id::TEXT FROM 1 FOR 6))),
+      'package_type', v_trash_reg.package_type,
+      'total_due', v_trash_reg.total_due,
       'message', 'Data pendaftaran Anda berhasil diperbarui dan sedang menunggu verifikasi pembayaran.',
       'wa_group_url', COALESCE(v_event.web_registration_config->>'wa_group_url', '')
     );
@@ -220,7 +238,7 @@ BEGIN
   IF FOUND THEN
     SELECT ticket_code INTO v_existing_ticket FROM public.tickets WHERE registration_id = v_existing_reg.id LIMIT 1;
 
-    IF v_existing_reg.status IN ('CONFIRMED', 'ATTENDED') THEN
+    IF v_existing_reg.status::text IN ('PAID', 'CONFIRMED', 'ATTENDED') THEN
       RETURN jsonb_build_object(
         'success', true,
         'is_duplicate', true,
@@ -228,6 +246,8 @@ BEGIN
         'status', 'PAID',
         'registration_id', v_existing_reg.id,
         'ticket_number', v_existing_ticket,
+        'package_type', v_existing_reg.package_type,
+        'total_due', v_existing_reg.total_due,
         'message', 'Anda sudah terdaftar resmi pada acara ini dan tiket resmi Anda telah terbit aktif.',
         'wa_group_url', COALESCE(v_event.web_registration_config->>'wa_group_url', '')
       );
@@ -247,6 +267,8 @@ BEGIN
       'status', 'PENDING',
       'registration_id', v_existing_reg.id,
       'ticket_number', v_existing_ticket,
+      'package_type', v_existing_reg.package_type,
+      'total_due', v_existing_reg.total_due,
       'message', 'Data pendaftaran Anda sudah pernah tercatat dan sedang menunggu verifikasi pembayaran oleh panitia.',
       'wa_group_url', COALESCE(v_event.web_registration_config->>'wa_group_url', '')
     );
@@ -321,7 +343,7 @@ BEGIN
       WHERE id = v_voucher_id;
     EXCEPTION WHEN OTHERS THEN
       NULL;
-    END IF;
+    END;
   END IF;
 
   -- 11. PROSES ANGGOTA MABAR

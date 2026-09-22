@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit3, Users, CreditCard, ShieldCheck, Tag, Trash2, RotateCcw } from 'lucide-react';
+import { X, Edit3, Users, CreditCard, ShieldCheck, Tag, Trash2, RotateCcw, Clock } from 'lucide-react';
 import { formatRupiah, parseRawNominal } from '../utils/formatters';
 import { useConfirm } from '../context/ConfirmContext';
 
@@ -17,13 +17,13 @@ export default function EditRegistrantModal({
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [instansi, setInstansi] = useState('');
-  const [packageType, setPackageType] = useState('individu'); // 'individu' | 'mabar' | 'custom'
+  const [packageType, setPackageType] = useState('individu'); // 'individu' | 'mabar' | 'mabar_11' | 'custom'
   const [nominal, setNominal] = useState(100000);
   const [bank, setBank] = useState('Bank Mandiri');
   const [statusBayar, setStatusBayar] = useState('LUNAS');
   const [buktiUrl, setBuktiUrl] = useState('');
   const [catatanCS, setCatatanCS] = useState('');
-  const [mabarMembers, setMabarMembers] = useState(['', '', '', '', '']);
+  const [mabarMembers, setMabarMembers] = useState(Array(10).fill(''));
 
   useEffect(() => {
     if (registrant) {
@@ -40,19 +40,30 @@ export default function EditRegistrantModal({
       setNominal(nom);
 
       const catLower = String(registrant.kategori || '').toLowerCase();
-      if (catLower.includes('mabar') || nom === 500000) {
-        setPackageType('mabar');
-      } else if (nom === 100000) {
-        setPackageType('individu');
-      } else {
-        setPackageType('custom');
+      const pType = String(registrant.packageType || '');
+      
+      let detectedType = 'custom';
+      if (pType === 'MABAR_11' || pType === 'GROUP_11' || catLower.includes('11') || catLower.includes('komunitas') || nom === 1000000) {
+        detectedType = 'mabar_11';
+      } else if (pType === 'MABAR_6' || pType === 'GROUP' || catLower.includes('mabar') || nom === 500000) {
+        detectedType = 'mabar';
+      } else if (pType === 'INDIVIDU' || nom === 100000) {
+        detectedType = 'individu';
       }
+      setPackageType(detectedType);
 
-      if (registrant.mabarMembers && Array.isArray(registrant.mabarMembers)) {
-        setMabarMembers(registrant.mabarMembers);
-      } else {
-        setMabarMembers(['', '', '', '', '']);
+      // Handle mabar members initialization
+      let existingMembers = [];
+      if (Array.isArray(registrant.mabarMembers) && registrant.mabarMembers.length > 0) {
+        existingMembers = registrant.mabarMembers;
+      } else if (Array.isArray(registrant.registration_members) && registrant.registration_members.length > 0) {
+        existingMembers = registrant.registration_members
+          .filter(m => m.member_role !== 'LEADER' && m.ticket_suffix !== 'A')
+          .map(m => m.persons?.full_name || m.full_name || m.name || '');
       }
+      
+      const paddedMembers = Array(10).fill('').map((_, i) => existingMembers[i] || '');
+      setMabarMembers(paddedMembers);
     }
   }, [registrant]);
 
@@ -64,6 +75,8 @@ export default function EditRegistrantModal({
       setNominal(100000);
     } else if (type === 'mabar') {
       setNominal(500000);
+    } else if (type === 'mabar_11') {
+      setNominal(1000000);
     }
   };
 
@@ -76,12 +89,23 @@ export default function EditRegistrantModal({
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    let kategoriStr = 'Individu (Rp 100.000)';
-    if (packageType === 'mabar') {
-      kategoriStr = 'Promo Mabar 5+1 Free (6 Peserta)';
+    let kategoriStr = 'Tiket Individu (1 Peserta) : Rp 100.000';
+    let finalPackageType = 'INDIVIDU';
+    if (packageType === 'mabar_11') {
+      kategoriStr = 'Promo Komunitas (11 Orang • 10+1) : Rp 1.000.000';
+      finalPackageType = 'MABAR_11';
+    } else if (packageType === 'mabar') {
+      kategoriStr = 'Promo Mabar (6 Orang • 5+1) : Rp 500.000';
+      finalPackageType = 'MABAR_6';
     } else if (packageType === 'custom') {
       kategoriStr = `Kustom (${formatRupiah(nominal)})`;
+      finalPackageType = 'CUSTOM';
     }
+
+    const activeMemberCount = packageType === 'mabar_11' ? 10 : packageType === 'mabar' ? 5 : 0;
+    const cleanMembers = activeMemberCount > 0 
+      ? mabarMembers.slice(0, activeMemberCount).filter(m => m.trim().length > 0) 
+      : [];
 
     onSave({
       ...registrant,
@@ -90,13 +114,14 @@ export default function EditRegistrantModal({
       whatsapp: whatsapp.replace(/^0/, '62'),
       instansi: instansi || 'Individu',
       kategori: kategoriStr,
+      packageType: finalPackageType,
       nominal: parseInt(nominal, 10) || 100000,
       bank,
       statusBayar,
       buktiUrl,
       rawBukti: buktiUrl,
       catatanCS,
-      mabarMembers: packageType === 'mabar' ? mabarMembers.filter(m => m.trim().length > 0) : []
+      mabarMembers: cleanMembers
     });
 
     onClose();
@@ -215,7 +240,7 @@ export default function EditRegistrantModal({
               <span>Pilihan Paket &amp; Nominal Pembayaran</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {/* Option 1: Individu */}
               <div
                 onClick={() => handlePackageChange('individu')}
@@ -247,7 +272,24 @@ export default function EditRegistrantModal({
                 <div className="text-[10px] text-slate-500 mt-1">Total 6 Peserta (Hemat Rp 100k)</div>
               </div>
 
-              {/* Option 3: Custom Nominal */}
+              {/* Option 3: Promo Komunitas (11 Pax) */}
+              <div
+                onClick={() => handlePackageChange('mabar_11')}
+                className={`p-3 rounded-xl border cursor-pointer transition-all ${
+                  packageType === 'mabar_11'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 shadow-2xs'
+                    : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100/60'
+                }`}
+              >
+                <div className="font-bold text-xs flex items-center gap-1">
+                  <span>Promo Komunitas (11 Pax)</span>
+                  <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-100 text-emerald-700 font-mono">10+1</span>
+                </div>
+                <div className="font-mono text-emerald-700 text-[11px] font-semibold mt-1">Rp 1.000.000</div>
+                <div className="text-[10px] text-slate-500 mt-1">Total 11 Peserta (Hemat Rp 100k)</div>
+              </div>
+
+              {/* Option 4: Custom Nominal */}
               <div
                 onClick={() => handlePackageChange('custom')}
                 className={`p-3 rounded-xl border cursor-pointer transition-all ${
@@ -258,7 +300,7 @@ export default function EditRegistrantModal({
               >
                 <div className="font-bold text-xs">Kustom / Kode Unik</div>
                 <div className="font-mono text-sky-700 text-[11px] font-semibold mt-1">Input Bebas</div>
-                <div className="text-[10px] text-slate-500 mt-1">Multi-paket / kode unik transfer</div>
+                <div className="text-[10px] text-slate-500 mt-1">Multi-paket / kode unik</div>
               </div>
             </div>
 
@@ -289,37 +331,77 @@ export default function EditRegistrantModal({
             </div>
           </div>
 
-          {/* Section: Anggota Mabar (Jika Mabar dipilih) */}
-          {packageType === 'mabar' && (
-            <div className="p-4 rounded-xl bg-purple-50/70 border border-purple-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 font-bold text-xs text-purple-900">
-                  <Users className="w-4 h-4 text-purple-700" />
-                  <span>Daftar 5 Anggota Mabar Tambahan (5+1 Free)</span>
-                </div>
-                <span className="text-[10.5px] text-slate-500 font-medium">Total 6 Peserta</span>
-              </div>
-              <p className="text-[11px] text-slate-600 leading-relaxed">
-                Koordinator utama: <span className="text-slate-900 font-semibold">{nama || 'Belum diisi'}</span>. Masukkan nama 5 peserta lainnya di bawah ini:
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {mabarMembers.map((member, idx) => (
-                  <div key={idx}>
-                    <label className="block text-[10.5px] text-purple-800 mb-0.5 font-semibold">
-                      Peserta {idx + 2}:
-                    </label>
-                    <input
-                      type="text"
-                      value={member}
-                      onChange={(e) => handleMemberChange(idx, e.target.value)}
-                      placeholder={`Nama Anggota ${idx + 2}`}
-                      className="w-full bg-white border border-purple-200 rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none focus:border-purple-500"
-                    />
+          {/* Section: Anggota Mabar / Komunitas (Jika Mabar atau Komunitas dipilih) */}
+          {(packageType === 'mabar' || packageType === 'mabar_11') && (() => {
+            const maxMembers = packageType === 'mabar_11' ? 10 : 5;
+            const filledCount = mabarMembers.slice(0, maxMembers).filter(m => m.trim().length > 0).length;
+            const emptyCount = maxMembers - filledCount;
+
+            return (
+              <div className={`p-4 rounded-xl border space-y-3.5 ${
+                packageType === 'mabar_11'
+                  ? 'bg-emerald-50/70 border-emerald-200'
+                  : 'bg-purple-50/70 border-purple-200'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <div className={`flex items-center gap-1.5 font-bold text-xs ${
+                    packageType === 'mabar_11' ? 'text-emerald-900' : 'text-purple-900'
+                  }`}>
+                    <Users className={`w-4 h-4 ${
+                      packageType === 'mabar_11' ? 'text-emerald-700' : 'text-purple-700'
+                    }`} />
+                    <span>
+                      {packageType === 'mabar_11'
+                        ? 'Daftar 10 Anggota Komunitas Tambahan (10+1 Free)'
+                        : 'Daftar 5 Anggota Mabar Tambahan (5+1 Free)'}
+                    </span>
                   </div>
-                ))}
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-100 text-amber-900 border border-amber-200">
+                    Boleh Kosong (Menyusul)
+                  </span>
+                </div>
+
+                {/* Banner Edukasi: Tidak Wajib Diisi Semua Sekarang */}
+                <div className="p-3 rounded-xl bg-white/90 border border-amber-200 text-[11px] text-amber-950 flex items-start gap-2 leading-relaxed shadow-2xs">
+                  <Clock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-semibold text-amber-900">Nama Anggota Bersifat Fleksibel (Boleh Menyusul):</span>
+                    <p className="text-stone-600 mt-0.5 font-light">
+                      Koordinator dapat mendaftar dan membayar terlebih dahulu untuk mengunci kuota promo. Slot di bawah ini <strong>tidak wajib diisi semua sekarang</strong>. Anda dapat mengosongkannya dan melengkapinya kapan saja saat koordinator mengirimkan nama via WhatsApp.
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2 font-mono text-[10.5px]">
+                      <span className="text-emerald-700 font-semibold">✓ Terisi: {filledCount} peserta</span>
+                      <span className="text-stone-300">•</span>
+                      <span className="text-amber-800">{emptyCount > 0 ? `⏳ ${emptyCount} slot menyusul` : 'Semua nama lengkap'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {mabarMembers.slice(0, maxMembers).map((member, idx) => (
+                    <div key={idx}>
+                      <label className={`block text-[10.5px] mb-0.5 font-semibold ${
+                        packageType === 'mabar_11' ? 'text-emerald-800' : 'text-purple-800'
+                      }`}>
+                        Peserta #{idx + 2} {idx === maxMembers - 1 ? '(Bonus Tiket Gratis)' : ''} <span className="text-stone-400 font-normal">(Opsional)</span>:
+                      </label>
+                      <input
+                        type="text"
+                        value={member}
+                        onChange={(e) => handleMemberChange(idx, e.target.value)}
+                        placeholder={`Nama Anggota #${idx + 2} (Kosongkan jika menyusul)`}
+                        className={`w-full bg-white border rounded-lg px-3 py-1.5 text-xs text-slate-900 focus:outline-none placeholder:text-slate-400 placeholder:italic ${
+                          packageType === 'mabar_11'
+                            ? 'border-emerald-200 focus:border-emerald-500'
+                            : 'border-purple-200 focus:border-purple-500'
+                        }`}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Section: Bank & Status Bayar */}
           <div className="space-y-3 pt-3 border-t border-slate-100">

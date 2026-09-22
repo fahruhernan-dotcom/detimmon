@@ -16,30 +16,35 @@ import {
   Sparkles
 } from 'lucide-react';
 import { formatRupiah, formatDate } from '../../utils/formatters';
+import ProofModal from '../../components/ProofModal';
+import PaymentLedgerModal from './PaymentLedgerModal';
+import { registrationService } from '../../services/registrationService';
+import { paymentService } from '../../services/paymentService';
 
 /**
- * PaymentsView — Payment verification workspace
- * Strictly implements PHASE_03_UI_UX_PAYMENTS.md:
- * - Default tab: Pending
- * - Inline proof thumbnail & quick verify
- * - Speed-Queue Fast Verification Modal integration
- * - Rejection dialog with required reason category
- * - Deep ledger access
+ * PaymentsView — Payment verification workspace (Autonomous & Self-Contained)
+ * Handles its own ProofModal, PaymentLedgerModal, rejection modals, and quick verification.
  */
 export default function PaymentsView({
   registrants = [],
+  setRegistrants,
   onSelectParticipant,
   onOpenFastVerify,
   onVerifyPayment,
   onRejectPaymentWithReason,
-  onViewProof,
-  onOpenLedger,
+  googleOAuthToken,
+  setGoogleOAuthToken,
+  config = {},
   initialTab = 'pending'
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
   const [search, setSearch] = useState('');
   const [packageFilter, setPackageFilter] = useState('all');
   const [proofFilter, setProofFilter] = useState('all');
+
+  // Co-located modals state
+  const [activeProof, setActiveProof] = useState(null);
+  const [activeLedgerRegistrant, setActiveLedgerRegistrant] = useState(null);
 
   // Rejection Dialog State
   const [rejectingParticipant, setRejectingParticipant] = useState(null);
@@ -48,27 +53,22 @@ export default function PaymentsView({
 
   const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
 
-  // Counts for tabs (exclude soft-deleted)
   const pendingCount = activeRegistrants.filter(r => r.statusBayar === 'PENDING').length;
   const verifiedCount = activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length;
   const rejectedCount = activeRegistrants.filter(r => r.statusBayar === 'DITOLAK' || r.statusBayar === 'REJECTED').length;
 
   const filteredData = useMemo(() => {
     return activeRegistrants.filter((item) => {
-      // Tab filter
       if (activeTab === 'pending' && item.statusBayar !== 'PENDING') return false;
       if (activeTab === 'verified' && item.statusBayar !== 'LUNAS') return false;
       if (activeTab === 'rejected' && item.statusBayar !== 'DITOLAK' && item.statusBayar !== 'REJECTED') return false;
 
-      // Package filter
       if (packageFilter === 'individu' && !item.kategori?.toLowerCase().includes('individu') && item.nominal !== 100000) return false;
       if (packageFilter === 'mabar' && !item.kategori?.toLowerCase().includes('mabar') && item.nominal !== 500000) return false;
 
-      // Proof filter
-      if (proofFilter === 'has_proof' && !item.buktiBayar) return false;
-      if (proofFilter === 'no_proof' && Boolean(item.buktiBayar)) return false;
+      if (proofFilter === 'has_proof' && !item.buktiBayar && !item.buktiUrl) return false;
+      if (proofFilter === 'no_proof' && Boolean(item.buktiBayar || item.buktiUrl)) return false;
 
-      // Search query
       if (search.trim()) {
         const q = search.toLowerCase();
         return (
@@ -88,10 +88,38 @@ export default function PaymentsView({
       ? `${rejectReasonCategory}: ${rejectCustomNote.trim()}`
       : rejectReasonCategory;
 
-    onRejectPaymentWithReason(rejectingParticipant.id, fullReason);
+    if (onRejectPaymentWithReason) {
+      onRejectPaymentWithReason(rejectingParticipant.id, fullReason);
+    } else {
+      // Fallback direct mutation
+      if (setRegistrants) {
+        setRegistrants(prev => prev.map(item => item.id === rejectingParticipant.id ? { ...item, statusBayar: 'DITOLAK', rejectionReason: fullReason } : item));
+      }
+      if (rejectingParticipant.supabasePaymentId) {
+        paymentService.rejectPayment(rejectingParticipant.supabasePaymentId, fullReason).catch(console.warn);
+      }
+    }
+
     setRejectingParticipant(null);
-    setRejectReasonCategory('Bukti transfer buram/tidak terbaca');
+    setRejectReasonCategory('Bukti Buram / Tidak Terbaca');
     setRejectCustomNote('');
+  };
+
+  const handleVerify = (id) => {
+    if (onVerifyPayment) {
+      onVerifyPayment(id);
+    } else {
+      if (setRegistrants) {
+        setRegistrants(prev => prev.map(item => item.id === id ? { ...item, statusBayar: 'LUNAS' } : item));
+      }
+      const target = registrants.find(r => r.id === id);
+      if (target?.supabasePaymentId) {
+        paymentService.verifyPayment(target.supabasePaymentId, 'Diverifikasi via PaymentsView').catch(console.warn);
+      }
+      if (target?.supabaseRegistrationId) {
+        registrationService.updateRegistrationStatus(target.supabaseRegistrationId, 'PAID').catch(console.warn);
+      }
+    }
   };
 
   return (
@@ -104,7 +132,7 @@ export default function PaymentsView({
           <div className="inline-flex p-1 rounded-xl bg-slate-100 border border-slate-200/80 text-xs">
             <button
               onClick={() => setActiveTab('pending')}
-              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'pending' 
                   ? 'bg-white text-amber-900 shadow-2xs font-bold' 
                   : 'text-slate-600 hover:text-slate-900'
@@ -119,7 +147,7 @@ export default function PaymentsView({
             </button>
             <button
               onClick={() => setActiveTab('verified')}
-              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'verified' 
                   ? 'bg-white text-emerald-800 shadow-2xs font-bold' 
                   : 'text-slate-600 hover:text-slate-900'
@@ -129,7 +157,7 @@ export default function PaymentsView({
             </button>
             <button
               onClick={() => setActiveTab('rejected')}
-              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'rejected' 
                   ? 'bg-white text-rose-800 shadow-2xs font-bold' 
                   : 'text-slate-600 hover:text-slate-900'
@@ -139,7 +167,7 @@ export default function PaymentsView({
             </button>
             <button
               onClick={() => setActiveTab('all')}
-              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all ${
+              className={`px-3.5 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
                 activeTab === 'all' 
                   ? 'bg-white text-slate-950 shadow-2xs font-bold' 
                   : 'text-slate-600 hover:text-slate-900'
@@ -153,7 +181,7 @@ export default function PaymentsView({
           {pendingCount > 0 && onOpenFastVerify && (
             <button
               onClick={() => onOpenFastVerify(null)}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all active:scale-[0.98]"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white shadow-xs transition-all active:scale-[0.98] cursor-pointer"
               title="Buka Mode Verifikasi Kilat (Speed Queue) untuk semua transaksi pending"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -204,8 +232,7 @@ export default function PaymentsView({
                 filteredData.map((item) => {
                   const isLunas = item.statusBayar === 'LUNAS';
                   const isPending = item.statusBayar === 'PENDING';
-                  const isRejected = item.statusBayar === 'DITOLAK' || item.statusBayar === 'REJECTED';
-                  const hasProof = Boolean(item.buktiBayar);
+                  const hasProof = Boolean(item.buktiBayar || item.buktiUrl || item.rawBukti);
 
                   return (
                     <tr
@@ -215,7 +242,7 @@ export default function PaymentsView({
                       {/* Name & Package */}
                       <td 
                         className="py-3.5 px-4 cursor-pointer"
-                        onClick={() => onSelectParticipant(item)}
+                        onClick={() => onSelectParticipant && onSelectParticipant(item)}
                       >
                         <div className="font-semibold text-slate-950 group-hover:text-amber-800 transition-colors">
                           {item.nama}
@@ -228,7 +255,7 @@ export default function PaymentsView({
                       {/* Nominal */}
                       <td 
                         className="py-3.5 px-4 cursor-pointer"
-                        onClick={() => onSelectParticipant(item)}
+                        onClick={() => onSelectParticipant && onSelectParticipant(item)}
                       >
                         <div className="font-mono font-bold text-slate-900 text-sm">
                           {formatRupiah(item.nominal || 0)}
@@ -242,22 +269,25 @@ export default function PaymentsView({
                       <td className="py-3.5 px-4">
                         {hasProof ? (
                           <button
+                            type="button"
                             onClick={() => {
-                              if (isPending && onOpenFastVerify) {
-                                onOpenFastVerify(item.id);
-                              } else {
-                                onViewProof(item.buktiBayar, item.nama, item.rawBuktiBayar || item.buktiBayar);
-                              }
+                              setActiveProof({
+                                url: item.buktiUrl || item.buktiBayar,
+                                name: item.nama,
+                                rawBukti: item.rawBukti || item.rawBuktiBayar || item.buktiUrl,
+                                token: googleOAuthToken,
+                                clientId: config.clientId
+                              });
                             }}
-                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors ${
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-colors cursor-pointer ${
                               isPending
                                 ? 'bg-amber-50 hover:bg-amber-100 border-amber-300 text-amber-900 font-bold shadow-2xs'
                                 : 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-800'
                             }`}
-                            title={isPending ? "Pratinjau Bukti & Verifikasi Kilat" : "Lihat Bukti Transfer"}
+                            title="Lihat Bukti Transfer"
                           >
                             <Eye className="w-3 h-3 text-current" />
-                            <span>{isPending ? "Cek & Verif" : "Lihat Bukti"}</span>
+                            <span>Lihat Bukti</span>
                           </button>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 italic">
@@ -270,7 +300,7 @@ export default function PaymentsView({
                       {/* Waktu Submit */}
                       <td 
                         className="py-3.5 px-4 hidden md:table-cell text-[11px] text-slate-500 cursor-pointer"
-                        onClick={() => onSelectParticipant(item)}
+                        onClick={() => onSelectParticipant && onSelectParticipant(item)}
                       >
                         {item.timestamp ? formatDate(item.timestamp) : '14 Nov 2026'}
                       </td>
@@ -278,7 +308,7 @@ export default function PaymentsView({
                       {/* Status Badge */}
                       <td 
                         className="py-3.5 px-4 cursor-pointer"
-                        onClick={() => onSelectParticipant(item)}
+                        onClick={() => onSelectParticipant && onSelectParticipant(item)}
                       >
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10.5px] font-bold uppercase tracking-wider font-mono border ${
                           isLunas 
@@ -297,17 +327,19 @@ export default function PaymentsView({
                           {isPending && (
                             <>
                               <button
-                                onClick={() => onVerifyPayment(item.id)}
-                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-2xs transition-colors"
-                                title="Verifikasi LUNAS & Terbitkan Tiket"
+                                type="button"
+                                onClick={() => handleVerify(item.id)}
+                                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs shadow-2xs transition-colors cursor-pointer"
+                                title="Verifikasi LUNAS"
                               >
                                 <Check className="w-3.5 h-3.5" />
                                 <span>Verifikasi</span>
                               </button>
 
                               <button
+                                type="button"
                                 onClick={() => setRejectingParticipant(item)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 font-semibold text-xs transition-colors"
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 font-semibold text-xs transition-colors cursor-pointer"
                                 title="Tolak Pembayaran dengan Alasan"
                               >
                                 <XCircle className="w-3.5 h-3.5" />
@@ -316,23 +348,25 @@ export default function PaymentsView({
                             </>
                           )}
 
-                          {onOpenLedger && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveLedgerRegistrant(item)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                            title="Buka Buku Kas (Ledger)"
+                          >
+                            <Receipt className="w-4 h-4" />
+                          </button>
+
+                          {onSelectParticipant && (
                             <button
-                              onClick={() => onOpenLedger(item)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                              title="Buka Buku Kas (Ledger)"
+                              type="button"
+                              onClick={() => onSelectParticipant(item)}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                              title="Buka Detail"
                             >
-                              <Receipt className="w-4 h-4" />
+                              <ChevronRight className="w-4 h-4" />
                             </button>
                           )}
-
-                          <button
-                            onClick={() => onSelectParticipant(item)}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-700 hover:bg-slate-100 transition-colors"
-                            title="Buka Detail"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
                         </div>
                       </td>
                     </tr>
@@ -350,7 +384,43 @@ export default function PaymentsView({
         </div>
       </div>
 
-      {/* ── REJECTION DIALOG (REQUIRED CATEGORY) ─────────────── */}
+      {/* ── CO-LOCATED MODALS ── */}
+      <ProofModal
+        isOpen={Boolean(activeProof)}
+        onClose={() => setActiveProof(null)}
+        proofData={activeProof}
+        onAuthorizeSuccess={(newToken) => {
+          if (setGoogleOAuthToken) setGoogleOAuthToken(newToken);
+          setActiveProof(prev => prev ? { ...prev, token: newToken } : null);
+        }}
+      />
+
+      <PaymentLedgerModal
+        isOpen={Boolean(activeLedgerRegistrant)}
+        onClose={() => setActiveLedgerRegistrant(null)}
+        registrant={activeLedgerRegistrant}
+        onViewProof={(url, name, rawBukti) => {
+          setActiveProof({
+            url,
+            name,
+            rawBukti,
+            token: googleOAuthToken,
+            clientId: config.clientId
+          });
+        }}
+        onPaymentUpdated={async (id, newStatus) => {
+          if (setRegistrants) {
+            setRegistrants(prev => prev.map(r => r.id === id ? { ...r, statusBayar: newStatus } : r));
+          }
+          const target = registrants.find(r => r.id === id);
+          if (target?.supabaseRegistrationId) {
+            const dbStatus = newStatus === 'LUNAS' ? 'PAID' : 'PENDING_PAYMENT';
+            await registrationService.updateRegistrationStatus(target.supabaseRegistrationId, dbStatus).catch(e => console.warn('Sync reg status err:', e));
+          }
+        }}
+      />
+
+      {/* ── REJECTION DIALOG ── */}
       {rejectingParticipant && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
@@ -399,14 +469,16 @@ export default function PaymentsView({
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
+                type="button"
                 onClick={() => setRejectingParticipant(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-50"
+                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 font-semibold text-xs hover:bg-slate-50 cursor-pointer"
               >
                 Batal
               </button>
               <button
+                type="button"
                 onClick={handleConfirmReject}
-                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs transition-colors"
+                className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer"
               >
                 Tolak Pembayaran
               </button>

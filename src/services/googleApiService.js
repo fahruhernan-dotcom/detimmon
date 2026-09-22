@@ -220,7 +220,7 @@ export function buildTicketEmailHtml(registrant = {}, options = {}) {
   <div class="wrapper">
     <div class="container">
       <div class="header">
-        <div class="logo-badge">LPK DIGNITY &bull; WEBINAR RESMI</div>
+        <div class="logo-badge">LPK DIGNITY • WEBINAR RESMI</div>
         <h1 class="title">E-TICKET & AKSES ZOOM</h1>
         <div class="subtitle">${eventTitle}</div>
       </div>
@@ -234,7 +234,9 @@ export function buildTicketEmailHtml(registrant = {}, options = {}) {
         <div class="ticket-card">
           <div class="ticket-label">Nomor Tiket Peserta Resmi</div>
           <div class="ticket-number">${nomorTicket}</div>
-          <div class="status-badge">&check; STATUS: TERVERIFIKASI & LUNAS</div>
+          <div class="status-badge" style="display: inline-block; background-color: ${isDark ? 'rgba(16, 185, 129, 0.2)' : '#ECFDF5'}; color: #059669; font-weight: 700; font-size: 11px; padding: 4px 14px; border-radius: 20px; border: 1px solid #10B981;">
+            <span style="font-size: 12px; margin-right: 4px;">✓</span> STATUS: TERVERIFIKASI &amp; LUNAS
+          </div>
         </div>
 
         <table class="data-table">
@@ -246,8 +248,36 @@ export function buildTicketEmailHtml(registrant = {}, options = {}) {
           <tr><td class="label">Waktu Acara</td><td class="value">${eventTime}</td></tr>
         </table>
 
+        ${(() => {
+          const catLower = String(kategori).toLowerCase();
+          const is11Pax = catLower.includes('komunitas') || catLower.includes('11') || catLower.includes('10+1') || nominal >= 900000;
+          const is6Pax = catLower.includes('mabar') || catLower.includes('5+1') || nominal === 500000;
+          const isGroup = is11Pax || is6Pax || registrant.is_mabar;
+          
+          if (!isGroup) return '';
+
+          const origin = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'http://localhost:8080';
+          const selfServiceUrl = `${origin}/#/cek-tiket?code=${encodeURIComponent(nomorTicket)}`;
+          const memberCount = is11Pax ? '10 Anggota Rombongan' : '5 Anggota Rombongan';
+          const totalPaxLabel = is11Pax ? '11 Pax (10+1 Free)' : '6 Pax (5+1 Free)';
+
+          return `
+        <div style="background: ${isDark ? 'rgba(147, 51, 234, 0.15)' : '#FAF5FF'}; border: 1.5px solid ${isDark ? '#A855F7' : '#D8B4FE'}; border-radius: 14px; padding: 20px; margin: 24px 0; text-align: left;">
+          <div style="color: ${isDark ? '#E9D5FF' : '#6B21A8'}; font-size: 14px; font-weight: 800; margin-bottom: 6px;">
+            👥 PAKET ROMBONGAN: ${totalPaxLabel}
+          </div>
+          <p style="font-size: 12.5px; color: ${isDark ? '#CBD5E1' : '#581C87'}; margin: 0 0 14px; line-height: 1.6;">
+            Anda mendaftar paket rombongan. Mohon lengkapi nama dan kontak <strong>${memberCount}</strong> Anda langsung melalui formulir mandiri di web agar sistem dapat menerbitkan e-tiket resmi masing-masing anggota secara otomatis.
+          </p>
+          <a href="${selfServiceUrl}" style="display: block; background: #7C3AED; color: #FFFFFF !important; text-decoration: none; text-align: center; font-weight: 700; font-size: 13px; padding: 12px 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25);" target="_blank">
+            👉 LENGKAPI DATA ANGGOTA ROMBONGAN DI WEB
+          </a>
+        </div>
+          `;
+        })()}
+
         <div class="access-box">
-          <div class="access-title">&bull; Akses Ruangan Live Zoom Meeting</div>
+          <div class="access-title">• Akses Ruangan Live Zoom Meeting</div>
           <div class="access-item"><strong>Meeting ID:</strong> ${meetingId}</div>
           <div class="access-item"><strong>Passcode:</strong> ${passcode}</div>
           <div class="access-item"><strong>Instruksi Masuk:</strong> Harap gunakan format nama: <em>${nomorTicket.split('-').pop()} - ${nama}</em> saat bergabung ke ruang Zoom.</div>
@@ -261,8 +291,8 @@ export function buildTicketEmailHtml(registrant = {}, options = {}) {
       </div>
 
       <div class="footer">
-        <div><strong>LPK Indonesia Dignity &bull; Strategic Training Partner KLTC&reg;</strong></div>
-        <div style="margin-top: 4px;">Hotline Helpdesk WhatsApp: ${helpdeskPhone} &bull; Surakarta, Jawa Tengah</div>
+        <div><strong>LPK Indonesia Dignity • Strategic Training Partner KLTC®</strong></div>
+        <div style="margin-top: 4px;">Hotline Helpdesk WhatsApp: ${helpdeskPhone} • Surakarta, Jawa Tengah</div>
         <div style="margin-top: 4px; font-size: 10.5px; color: #94A3B8;">Email ini diterbitkan otomatis oleh Dignity Admin Command Center melalui Gmail API resmi.</div>
       </div>
     </div>
@@ -327,7 +357,7 @@ export function buildCertificateEmailHtml(attendance = {}, options = {}) {
   <div class="wrapper">
     <div class="container">
       <div class="header">
-        <div class="logo-badge">LPK DIGNITY &bull; SERTIFIKASI RESMI</div>
+        <div class="logo-badge">LPK DIGNITY • SERTIFIKASI RESMI</div>
         <h1 class="title">E-SERTIFIKAT KELULUSAN</h1>
         <div class="subtitle">${eventTitle}</div>
       </div>
@@ -341,7 +371,7 @@ export function buildCertificateEmailHtml(attendance = {}, options = {}) {
         <div class="cert-card">
           <div class="cert-label">Nomor Registrasi Sertifikat Sah</div>
           <div class="cert-number">${nomorSertifikat}</div>
-          <a href="${verifyUrl}" target="_blank" class="btn-verify">Verifikasi Keaslian Sertifikat di Portal Dignity &rarr;</a>
+          <a href="${verifyUrl}" target="_blank" class="btn-verify">Verifikasi Keaslian Sertifikat di Portal Dignity →</a>
         </div>
 
         <div class="voucher-card">
@@ -351,15 +381,15 @@ export function buildCertificateEmailHtml(attendance = {}, options = {}) {
             Sebagai alumni program ini, Anda berhak mendapatkan potongan langsung sebesar <strong>${voucherDiscount}</strong> untuk pendaftaran <strong>${bootcampTitle}</strong> (${bootcampDates}).
           </div>
           <a href="${registerNextUrl || `https://wa.me/${helpdeskPhone.replace(/[^0-9]/g, '')}?text=Halo%20Admin,%20saya%20ingin%20klaim%20Voucher%20Rebate%20${kodeVoucher}%20untuk%20Bootcamp%20Public%20Speaking`}" class="btn-bootcamp" target="_blank">
-            ${registerNextUrl ? 'DAFTAR SEKARANG DENGAN VOUCHER ALUMNI &rarr;' : 'KLAIM VOUCHER KE WHATSAPP ADMIN'}
+            ${registerNextUrl ? 'DAFTAR SEKARANG DENGAN VOUCHER ALUMNI →' : 'KLAIM VOUCHER KE WHATSAPP ADMIN'}
           </a>
         </div>
       </div>
 
       <div class="footer">
-        <div><strong>LPK Indonesia Dignity &bull; Lembaga Pelatihan Kerja Terakreditasi</strong></div>
-        <div style="margin-top: 4px;">Surakarta, Jawa Tengah, Indonesia &bull; Hotline: ${helpdeskPhone}</div>
-        <div style="margin-top: 4px; font-size: 10.5px; color: #94A3B8;">Diterbitkan resmi via Dignity Admin Command Center &bull; Gmail API.</div>
+        <div><strong>LPK Indonesia Dignity • Lembaga Pelatihan Kerja Terakreditasi</strong></div>
+        <div style="margin-top: 4px;">Surakarta, Jawa Tengah, Indonesia • Hotline: ${helpdeskPhone}</div>
+        <div style="margin-top: 4px; font-size: 10.5px; color: #94A3B8;">Diterbitkan resmi via Dignity Admin Command Center • Gmail API.</div>
       </div>
     </div>
   </div>

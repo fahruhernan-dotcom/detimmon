@@ -48,6 +48,13 @@ export const registrationService = {
           proof_drive_file_id,
           submitted_at,
           verified_at
+        ),
+        tickets (
+          id,
+          ticket_code,
+          status,
+          issued_at,
+          sent_at
         )
       `)
       .eq('event_id', eventId)
@@ -259,48 +266,31 @@ export const registrationService = {
       voucherCode        // [NEW v2] kode voucher opsional
     } = payload;
 
-    // Panggil Stored Procedure atomic di Supabase (v2 dengan voucher support)
+    // Panggil Stored Procedure atomic di Supabase
     const { data, error } = await supabase.rpc('submit_web_registration', {
       p_event_id:         eventId,
-      p_full_name:        fullName,
+      p_nama:             fullName,
       p_email:            email,
       p_whatsapp:         whatsapp,
       p_institution:      institution || null,
-      p_job_title:        jobTitle || null,
       p_city:             city || null,
       p_package_type:     packageType || 'INDIVIDU',
-      p_total_due:        totalDue || 100000,
-      p_bank_destination: bankDestination || 'Bank Mandiri',
+      p_gross_amount:     totalDue || 100000,
+      p_net_amount:       totalDue || 100000,
+      p_voucher_code:     voucherCode || null,
       p_proof_data:       proofData || null,
       p_notes:            notes || null,
       p_mabar_members:    mabarMembers || [],
-      p_voucher_code:     voucherCode || null  // [NEW v2]
+      // Backward compatibility aliases
+      p_full_name:        fullName,
+      p_job_title:        jobTitle || null,
+      p_total_due:        totalDue || 100000,
+      p_bank_destination: bankDestination || 'Bank Mandiri'
     });
 
     if (error) {
-      // Jika RPC belum dieksekusi di database oleh user, gunakan fallback client-side aman
-      console.warn('Notice RPC submit_web_registration fallback to direct service:', error.message);
-      const reg = await this.createRegistration({
-        eventId,
-        fullName,
-        email,
-        whatsapp,
-        institution,
-        city,
-        packageType,
-        totalDue,
-        bankDestination,
-        proofDriveFileId: proofData,
-        rawBukti: proofData,
-        notes
-      });
-      return {
-        success: true,
-        is_duplicate: false,
-        registration_id: reg?.id,
-        ticket_number: `TICKET-DIGNITY-${Math.floor(100 + Math.random() * 900)}`,
-        status: 'NEW'
-      };
+      console.error('RPC submit_web_registration error:', error);
+      throw error;
     }
 
     return data;
@@ -321,13 +311,14 @@ export const registrationService = {
       packageType,
       totalDue,
       status,
-      notes
+      notes,
+      mabarMembers
     } = updates;
 
     // 1. Ambil data registrasi untuk mendapatkan person_id
     const { data: reg, error: regFetchErr } = await supabase
       .from('registrations')
-      .select('id, person_id')
+      .select('id, person_id, event_id, persons ( id, institution, city )')
       .eq('id', registrationId)
       .single();
 
@@ -354,7 +345,12 @@ export const registrationService = {
     const regUpdates = {};
     if (packageType) regUpdates.package_type = packageType;
     if (totalDue !== undefined) regUpdates.total_due = totalDue;
-    if (status) regUpdates.status = status;
+    if (status) {
+      let validStatus = status;
+      if (status === 'CONFIRMED' || status === 'LUNAS' || status === 'VERIFIED') validStatus = 'PAID';
+      else if (status === 'PENDING' || status === 'BELUM_BAYAR') validStatus = 'PENDING_PAYMENT';
+      regUpdates.status = validStatus;
+    }
     if (notes !== undefined) regUpdates.custom_notes = notes;
     regUpdates.updated_at = new Date().toISOString();
 
@@ -366,6 +362,64 @@ export const registrationService = {
       .single();
 
     if (regUpdateErr) throw regUpdateErr;
+
+    // 4. Sinkronisasi anggota mabar jika diinputkan
+    if (Array.isArray(mabarMembers) && reg?.id) {
+      try {
+        const regPerson = reg.persons || {};
+        const regInst = regPerson.institution || '-';
+        const regCity = regPerson.city || '-';
+
+        for (let i = 0; i < mabarMembers.length; i++) {
+          const mVal = mabarMembers[i];
+          const mName = typeof mVal === 'string' ? mVal.trim() : (mVal?.nama || '').trim();
+          if (!mName) continue;
+
+          const suffix = String.fromCharCode(66 + i); // Suffix B, C, D, ...
+
+          // Cek apakah slot sudah ada di registration_members
+          const { data: existingSlot } = await supabase
+            .from('registration_members')
+            .select('id, person_id')
+            .eq('registration_id', registrationId)
+            .eq('ticket_suffix', suffix)
+            .maybeSingle();
+
+          if (existingSlot) {
+            // Update nama person yang sudah terhubung
+            await supabase
+              .from('persons')
+              .update({ full_name: mName })
+              .eq('id', existingSlot.person_id);
+          } else {
+            // Buat person baru dan daftarkan ke registration_members
+            const { data: newPerson } = await supabase
+              .from('persons')
+              .insert({
+                full_name: mName,
+                institution: regInst,
+                city: regCity
+              })
+              .select('id')
+              .single();
+
+            if (newPerson?.id) {
+              await supabase
+                .from('registration_members')
+                .insert({
+                  registration_id: registrationId,
+                  person_id: newPerson.id,
+                  member_role: 'MEMBER',
+                  ticket_suffix: suffix
+                });
+            }
+          }
+        }
+      } catch (memErr) {
+        console.warn('Notice update mabarMembers in registrationService:', memErr.message);
+      }
+    }
+
     return updatedReg;
   },
 
@@ -548,10 +602,19 @@ export const registrationService = {
   async updateRegistrationStatus(registrationId, status) {
     if (!registrationId) throw new Error('registrationId wajib diisi');
 
+    // Pemetaan defensif terhadap enum PostgreSQL registration_status:
+    // ('NEW', 'PENDING_PAYMENT', 'PAYMENT_SUBMITTED', 'PAYMENT_REVIEW', 'PAID', 'CANCELLED')
+    let validStatus = status;
+    if (status === 'CONFIRMED' || status === 'LUNAS' || status === 'VERIFIED') {
+      validStatus = 'PAID';
+    } else if (status === 'PENDING' || status === 'BELUM_BAYAR') {
+      validStatus = 'PENDING_PAYMENT';
+    }
+
     const { data, error } = await supabase
       .from('registrations')
       .update({
-        status,
+        status: validStatus,
         updated_at: new Date().toISOString()
       })
       .eq('id', registrationId)
@@ -559,6 +622,52 @@ export const registrationService = {
       .single();
 
     if (error) throw error;
+    return data;
+  },
+
+  /**
+   * Submit data anggota rombongan secara mandiri (self-service) atau via admin
+   * Memanggil RPC database submit_group_members yang otomatis menerbitkan sub-tiket (A s/d K)
+   * Dilindungi otorisasi email/phone ketua rombongan (p_auth_credential)
+   */
+  async submitGroupMembers(registrationId, members = [], submittedBy = 'SELF_SERVICE', authCredential = null) {
+    if (!registrationId) throw new Error('Registration ID wajib disertakan.');
+
+    const params = {
+      p_registration_id: registrationId,
+      p_members: members,
+      p_submitted_by: submittedBy
+    };
+    if (authCredential !== undefined && authCredential !== null) {
+      params.p_auth_credential = authCredential;
+    }
+
+    const { data, error } = await supabase.rpc('submit_group_members', params);
+
+    if (error) {
+      console.error('Error in submitGroupMembers RPC:', error);
+      throw error;
+    }
+
+    return data;
+  },
+
+  /**
+   * Mengambil status slot rombongan lengkap (A s/d K atau A s/d F)
+   * Mengembalikan daftar slot terisi vs kosong untuk form pengisian mandiri dan dashboard
+   */
+  async getGroupRegistrationDetails(query) {
+    if (!query || !query.trim()) throw new Error('Kata kunci pencarian wajib diisi.');
+
+    const { data, error } = await supabase.rpc('get_group_registration_details', {
+      p_query: query.trim()
+    });
+
+    if (error) {
+      console.error('Error in getGroupRegistrationDetails RPC:', error);
+      throw error;
+    }
+
     return data;
   }
 };

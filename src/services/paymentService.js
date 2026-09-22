@@ -34,6 +34,22 @@ export const paymentService = {
       .single();
 
     if (error) throw error;
+
+    // Sinkronkan status registrasi ke PAID jika ada registration_id
+    if (data?.registration_id) {
+      try {
+        await supabase
+          .from('registrations')
+          .update({
+            status: 'PAID',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.registration_id);
+      } catch (regErr) {
+        console.warn('Notice sync registration status to PAID:', regErr.message);
+      }
+    }
+
     return data;
   },
 

@@ -16,6 +16,7 @@ import {
   buildCertificateEmailHtml,
   sendEmailViaGmail
 } from '../../services/googleApiService';
+import { emailService } from '../../services/emailService';
 
 export default function EmailPreviewModal({
   isOpen,
@@ -90,7 +91,7 @@ export default function EmailPreviewModal({
     setFeedback(null);
 
     try {
-      await sendEmailViaGmail({
+      const sendResult = await sendEmailViaGmail({
         accessToken: googleOAuthToken,
         to: registrant.email,
         subject,
@@ -98,11 +99,22 @@ export default function EmailPreviewModal({
         fromName: 'LPK Indonesia Dignity Official'
       });
 
+      if (type === 'ticket') {
+        await emailService.recordTicketEmailDispatch({
+          ticketId: registrant.supabaseTicketId,
+          registrationId: registrant.supabaseRegistrationId || registrant.id,
+          recipientEmail: registrant.email,
+          subject,
+          providerMessageId: sendResult?.id || null,
+          status: 'SENT'
+        }).catch(err => console.warn('Record dispatch warning in modal:', err));
+      }
+
       setFeedback({
         success: true,
         message: `Email berhasil dikirimkan ke ${registrant.email}!`
       });
-      if (onEmailSent) onEmailSent(registrant);
+      if (onEmailSent) onEmailSent(registrant, sendResult);
     } catch (err) {
       setFeedback({
         success: false,
