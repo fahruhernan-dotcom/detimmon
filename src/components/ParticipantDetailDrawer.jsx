@@ -170,20 +170,27 @@ export default function ParticipantDetailDrawer({
 
           {/* Deep Action Bar */}
           <div className="mt-3.5 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <button
-              onClick={() => {
-                if (onEditParticipant) onEditParticipant(participant);
-              }}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-amber-700 transition-colors"
-            >
-              <Edit3 className="w-3.5 h-3.5" />
-              <span>Buka Edit Data Lengkap</span>
-            </button>
+            {participant.isDeleted ? (
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-600 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
+                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                <span>Peserta Nonaktif (Di Tempat Sampah)</span>
+              </span>
+            ) : (
+              <button
+                onClick={() => {
+                  if (onEditParticipant) onEditParticipant(participant);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-amber-700 transition-colors cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Buka Edit Data Lengkap</span>
+              </button>
+            )}
 
             {isMabar && onOpenMembers && (
               <button
                 onClick={() => onOpenMembers(participant)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
               >
                 <Users className="w-3.5 h-3.5" />
                 <span>Lihat Anggota MABAR</span>
@@ -405,7 +412,13 @@ export default function ParticipantDetailDrawer({
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
               <span>Tindakan Cepat (Quick Actions)</span>
             </h3>
-            <div className="space-y-2">
+            {participant.isDeleted ? (
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-center text-xs text-slate-500 space-y-1">
+                <p>Pendaftar ini berada di <strong>Tempat Sampah</strong>.</p>
+                <p className="text-[11px] text-slate-400">Pulihkan peserta terlebih dahulu untuk memverifikasi pembayaran atau mengirim tiket.</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
               {/* Payment Verification / Rejection (if pending) */}
               {isPending && (
                 <div className="grid grid-cols-2 gap-2">
@@ -461,6 +474,7 @@ export default function ParticipantDetailDrawer({
                 </button>
               )}
             </div>
+          )}
           </section>
 
           {/* ── SECTION 4: RELATED RECORDS ──────────────────── */}

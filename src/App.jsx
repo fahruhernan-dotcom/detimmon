@@ -711,6 +711,9 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
     if (activeDrawerParticipant?.id === id) {
       setActiveDrawerParticipant(null);
     }
+    if (editingRegistrant?.id === id) {
+      setEditingRegistrant(null);
+    }
 
     try {
       const regDbId = target.supabaseRegistrationId || target.id;
@@ -1774,7 +1777,9 @@ function AdminCommandCenter({ currentPath, setCurrentPath }) {
           registrant={editingRegistrant}
           onClose={() => setEditingRegistrant(null)}
           onSave={handleSaveEditedRegistrant}
-          onDelete={handleDeleteRegistrant}
+          onDelete={handleSoftDeleteParticipant}
+          onRestore={handleRestoreParticipant}
+          onPermanentDelete={handlePermanentDeleteParticipant}
         />
 
         <PaymentLedgerModal

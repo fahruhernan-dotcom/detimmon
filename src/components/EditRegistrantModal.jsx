@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit3, Users, CreditCard, ShieldCheck, Tag, Trash2 } from 'lucide-react';
+import { X, Edit3, Users, CreditCard, ShieldCheck, Tag, Trash2, RotateCcw } from 'lucide-react';
 import { formatRupiah, parseRawNominal } from '../utils/formatters';
+import { useConfirm } from '../context/ConfirmContext';
 
-export default function EditRegistrantModal({ isOpen, onClose, registrant, onSave, onDelete }) {
+export default function EditRegistrantModal({ 
+  isOpen, 
+  onClose, 
+  registrant, 
+  onSave, 
+  onDelete,
+  onRestore,
+  onPermanentDelete
+}) {
+  const confirm = useConfirm();
   const [nama, setNama] = useState('');
   const [email, setEmail] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
@@ -113,6 +123,32 @@ export default function EditRegistrantModal({ isOpen, onClose, registrant, onSav
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Banner Jika Berada di Tempat Sampah */}
+        {registrant.isDeleted && (
+          <div className="mx-6 mt-4 p-3.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 flex items-center justify-between text-xs animate-fade-in flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Trash2 className="w-4 h-4 text-rose-600 shrink-0" />
+              <div>
+                <span className="font-bold">Pendaftar ini berada di Tempat Sampah (Nonaktif)</span>
+                <p className="text-[11px] text-rose-700">Data pendaftar ini tidak dihitung dalam kuota kursi maupun laporan kas.</p>
+              </div>
+            </div>
+            {onRestore && (
+              <button
+                type="button"
+                onClick={() => {
+                  onRestore(registrant.id);
+                  onClose();
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs transition-colors cursor-pointer shrink-0"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Pulihkan</span>
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Scrollable Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 text-xs flex-1">
@@ -365,34 +401,85 @@ export default function EditRegistrantModal({ isOpen, onClose, registrant, onSav
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-2.5 pt-4 border-t border-slate-100">
-            {onDelete ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onDelete && registrant) {
-                    onDelete(registrant.id);
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors"
-                title="Hapus data pendaftar ini dari database"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Hapus Pendaftar</span>
-              </button>
-            ) : <div></div>}
+          <div className="flex items-center justify-between gap-2.5 pt-4 border-t border-slate-100 flex-shrink-0">
+            {registrant.isDeleted ? (
+              <div className="flex items-center gap-2">
+                {onPermanentDelete && (
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: 'Hapus Permanen Peserta?',
+                        description: `Data pendaftar "${registrant.nama}" (${registrant.nomorTicket || '-'}) akan dihapus permanen dari database Supabase.`,
+                        note: 'Peringatan: Seluruh riwayat tiket dan pembayaran akan ikut dihapus. Tindakan ini tidak dapat dibatalkan (Irreversible).',
+                        variant: 'danger',
+                        confirmText: 'Ya, Hapus Permanen',
+                        cancelText: 'Batalkan'
+                      });
+                      if (ok) {
+                        onPermanentDelete(registrant.id);
+                        onClose();
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                    title="Hapus permanen dari database"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus Permanen dari DB</span>
+                  </button>
+                )}
+                {onRestore && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onRestore(registrant.id);
+                      onClose();
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Pulihkan</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              onDelete ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: 'Pindahkan ke Tempat Sampah?',
+                      description: `Pendaftar "${registrant.nama}" akan dipindahkan ke Tempat Sampah dan dinonaktifkan dari daftar peserta aktif.`,
+                      note: 'Data aman dan dapat dipulihkan kembali kapan saja.',
+                      variant: 'warning',
+                      confirmText: 'Pindahkan ke Sampah',
+                      cancelText: 'Batalkan'
+                    });
+                    if (ok) {
+                      onDelete(registrant.id);
+                      onClose();
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-semibold transition-colors cursor-pointer"
+                  title="Pindahkan pendaftar ini ke tempat sampah"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Pindahkan ke Tempat Sampah</span>
+                </button>
+              ) : <div></div>
+            )}
 
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold transition-colors"
+                className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-semibold transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-xs transition-all active:scale-[0.98]"
+                className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold shadow-xs transition-all active:scale-[0.98] cursor-pointer"
               >
                 Simpan Perubahan
               </button>
