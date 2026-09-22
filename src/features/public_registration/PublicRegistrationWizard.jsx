@@ -423,6 +423,10 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
 
           if (rpcRes?.is_duplicate) {
             newRegistration.isDuplicate = true;
+            newRegistration.isGroupMember = Boolean(rpcRes.is_group_member);
+            newRegistration.leaderName = rpcRes.leader_name || null;
+            newRegistration.leaderWhatsapp = rpcRes.leader_whatsapp || null;
+            newRegistration.parentPackage = rpcRes.parent_package || null;
             newRegistration.duplicateMessage = sanitizePublicMessage(rpcRes.message);
             if (rpcRes.ticket_number) newRegistration.nomorTicket = rpcRes.ticket_number;
             if (rpcRes.status === 'PAID') newRegistration.statusBayar = 'VERIFIED';
@@ -988,6 +992,55 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                       alert('Mohon isi nama lengkap, alamat email, dan nomor WhatsApp Anda.');
                       return;
                     }
+
+                    // Validasi khusus Promo Rombongan (Mode Isi Sekarang)
+                    if (isGroupPackage && groupFillMode === 'NOW') {
+                      const cleanLeaderPhone = normalizeWhatsApp(primaryData.whatsapp);
+                      const cleanLeaderEmail = normalizeEmail(primaryData.email);
+                      const activeMembers = mabarMembers.slice(0, groupAdditionalCount);
+
+                      // 1. Cek apakah koordinator memasukkan kontak dirinya sendiri di daftar anggota
+                      for (let i = 0; i < activeMembers.length; i++) {
+                        const m = activeMembers[i];
+                        const memberPhone = normalizeWhatsApp(m.whatsapp);
+                        const memberEmail = normalizeEmail(m.email);
+
+                        if (memberPhone && cleanLeaderPhone && memberPhone === cleanLeaderPhone) {
+                          alert(`Nomor WhatsApp Anggota #${i+2} sama dengan nomor Anda (Pendaftar Utama). Anda sudah otomatis terdaftar sebagai Peserta #1. Mohon masukkan nomor rekan anggota Anda.`);
+                          return;
+                        }
+                        if (memberEmail && cleanLeaderEmail && memberEmail === cleanLeaderEmail) {
+                          alert(`Alamat Email Anggota #${i+2} sama dengan email Anda (Pendaftar Utama). Anda sudah otomatis terdaftar sebagai Peserta #1. Mohon masukkan email rekan anggota Anda.`);
+                          return;
+                        }
+                      }
+
+                      // 2. Cek duplikasi antar anggota kelompok di dalam form
+                      const seenPhones = new Set();
+                      const seenEmails = new Set();
+                      for (let i = 0; i < activeMembers.length; i++) {
+                        const m = activeMembers[i];
+                        const memberPhone = normalizeWhatsApp(m.whatsapp);
+                        const memberEmail = normalizeEmail(m.email);
+
+                        if (memberPhone) {
+                          if (seenPhones.has(memberPhone)) {
+                            alert(`Terdapat duplikasi nomor WhatsApp pada daftar anggota rombongan Anda (Anggota #${i+2}). Mohon pastikan setiap anggota memiliki nomor yang unik.`);
+                            return;
+                          }
+                          seenPhones.add(memberPhone);
+                        }
+
+                        if (memberEmail) {
+                          if (seenEmails.has(memberEmail)) {
+                            alert(`Terdapat duplikasi alamat email pada daftar anggota rombongan Anda (Anggota #${i+2}). Mohon pastikan setiap anggota memiliki email yang unik.`);
+                            return;
+                          }
+                          seenEmails.add(memberEmail);
+                        }
+                      }
+                    }
+
                     setStep(3);
                   }}
                   className="flex-1 py-3 px-5 rounded-xl text-xs sm:text-sm font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(10,25,47,0.12)] active:scale-[0.98] cursor-pointer tracking-wide"
@@ -1474,52 +1527,124 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
       </div>
       )}
 
-      {/* ── ALERT DIALOG: PENDAFTARAN SEBELUMNYA TERDETEKSI (SUBMIT GANDA) ── */}
+      {/* ── ALERT DIALOG: PENDAFTARAN SEBELUMNYA TERDETEKSI (SUBMIT GANDA / ANGGOTA ROMBONGAN) ── */}
       <AlertDialog open={duplicateModalOpen} onOpenChange={setDuplicateModalOpen}>
         <AlertDialogContent className="bg-white border border-stone-200/90 rounded-2xl p-6 shadow-2xl max-w-md">
-          <AlertDialogHeader className="text-left space-y-2">
-            <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-1">
-              <AlertCircle className="w-6 h-6 stroke-[1.5]" />
-            </div>
-            <AlertDialogTitle className="text-base sm:text-lg font-serif font-semibold text-stone-900">
-              Pendaftaran Sebelumnya Terdeteksi
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs text-stone-600 space-y-2.5 font-light leading-relaxed">
-              <span>
-                Halo <strong>{duplicateModalData?.nama}</strong>, identitas email (<code className="font-mono text-stone-800">{duplicateModalData?.email}</code>) atau nomor WhatsApp (<code className="font-mono text-stone-800">{duplicateModalData?.whatsapp}</code>) Anda sudah pernah tercatat pada sistem kami untuk acara ini.
-              </span>
-              <div className="p-3 bg-[#FAF9F6] rounded-xl border border-stone-200 text-[11px] text-stone-700 space-y-1">
-                <div>
-                  Status Pembayaran: <strong className={duplicateModalData?.statusBayar === 'VERIFIED' ? 'text-emerald-800' : 'text-amber-900'}>
-                    {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Terverifikasi (Lunas)' : 'Menunggu Verifikasi Admin'}
-                  </strong>
+          {duplicateModalData?.isGroupMember ? (
+            /* ── TAMPILAN A: ANGGOTA SUDAH DIDAFTARKAN KOORDINATOR PROMO KOMUNITAS ── */
+            <>
+              <AlertDialogHeader className="text-left space-y-2">
+                <div className="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 mb-1">
+                  <Users className="w-6 h-6 stroke-[1.5]" />
                 </div>
-                <div>
-                  {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Nomor Tiket Resmi:' : 'No. Registrasi Sementara:'}{' '}
-                  <code className="font-mono font-bold text-stone-900">{duplicateModalData?.nomorTicket || duplicateModalData?.id}</code>
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-200 text-[10.5px] font-medium">
+                  <Sparkles className="w-3 h-3 text-emerald-700" />
+                  <span>Kabar Baik: Kuota Anda Sudah Terdaftar!</span>
                 </div>
-              </div>
-              <span className="block text-[11px] text-stone-500">
-                {duplicateModalData?.statusBayar === 'VERIFIED'
-                  ? 'Tiket resmi Anda sudah aktif. Anda dapat langsung membuka tanda terima resmi pendaftaran Anda.'
-                  : '⚠️ Tiket resmi acara belum aktif. Bukti transfer terbaru Anda telah kami simpan dan E-Ticket resmi akan diterbitkan setelah pembayaran diverifikasi oleh Admin.'}
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-2">
-            <AlertDialogCancel
-              onClick={() => setDuplicateModalOpen(false)}
-              className="text-xs rounded-xl py-2.5 text-stone-600 hover:text-stone-900 border-stone-200"
-            >
-              Periksa Kembali Data
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleProceedDuplicateReceipt}
-              className="text-xs rounded-xl py-2.5 bg-[#0A192F] hover:bg-[#112240] text-white"
-            >
-              Buka Tanda Terima Pendaftaran ↗
-            </AlertDialogAction>
-          </AlertDialogFooter>
+                <AlertDialogTitle className="text-base sm:text-lg font-serif font-semibold text-stone-900">
+                  Anda Sudah Terdaftar dalam Rombongan
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-stone-600 space-y-2.5 font-light leading-relaxed">
+                  <span>
+                    Halo <strong>{duplicateModalData?.nama}</strong>, Anda <strong>tidak perlu membayar</strong> pendaftaran mandiri ini. Anda telah didaftarkan oleh <strong className="text-stone-900">{duplicateModalData?.leaderName || 'Koordinator Kelompok'}</strong> sebagai peserta resmi pada paket <strong className="text-stone-900">{duplicateModalData?.parentPackage || 'Promo Komunitas 10+1'}</strong>.
+                  </span>
+                  <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-200/80 text-[11px] text-stone-700 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-500 font-light">Koordinator:</span>
+                      <strong className="text-emerald-950 font-medium">{duplicateModalData?.leaderName || '-'}</strong>
+                    </div>
+                    {duplicateModalData?.leaderWhatsapp && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-stone-500 font-light">Kontak Koordinator:</span>
+                        <a 
+                          href={`https://wa.me/${duplicateModalData.leaderWhatsapp.replace(/[^0-9]/g, '')}`} 
+                          target="_blank" 
+                          rel="noreferrer"
+                          className="text-emerald-700 hover:text-emerald-800 font-mono underline"
+                        >
+                          {duplicateModalData.leaderWhatsapp} ↗
+                        </a>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between">
+                      <span className="text-stone-500 font-light">Status Rombongan:</span>
+                      <strong className={duplicateModalData?.statusBayar === 'VERIFIED' ? 'text-emerald-800' : 'text-amber-900'}>
+                        {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Terverifikasi (Lunas)' : 'Menunggu Verifikasi Admin'}
+                      </strong>
+                    </div>
+                    <div className="flex items-center justify-between border-t border-emerald-200/60 pt-1.5 mt-1">
+                      <span className="text-stone-500 font-light">Kode Slot Tiket:</span>
+                      <code className="font-mono font-bold text-stone-900">{duplicateModalData?.nomorTicket || duplicateModalData?.id}</code>
+                    </div>
+                  </div>
+                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-950 text-[11px] leading-relaxed">
+                    💡 <strong>Hemat Uang Anda:</strong> Hak akses webinar & e-sertifikat Anda sudah dijamin oleh koordinator Anda. Anda tidak perlu mentransfer biaya apa pun.
+                  </div>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-2">
+                <AlertDialogCancel
+                  onClick={() => setDuplicateModalOpen(false)}
+                  className="text-xs rounded-xl py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-medium border-0 cursor-pointer shadow-xs"
+                >
+                  Tutup (Batalkan Bayar Mandiri)
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleProceedDuplicateReceipt}
+                  className="text-xs rounded-xl py-2.5 bg-white hover:bg-stone-100 text-stone-700 border border-stone-200/90 font-medium"
+                >
+                  Lihat Detail Tanda Terima ↗
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          ) : (
+            /* ── TAMPILAN B: PENDAFTARAN GANDA MANDIRI STANDARD ── */
+            <>
+              <AlertDialogHeader className="text-left space-y-2">
+                <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-700 mb-1">
+                  <AlertCircle className="w-6 h-6 stroke-[1.5]" />
+                </div>
+                <AlertDialogTitle className="text-base sm:text-lg font-serif font-semibold text-stone-900">
+                  Pendaftaran Sebelumnya Terdeteksi
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-xs text-stone-600 space-y-2.5 font-light leading-relaxed">
+                  <span>
+                    Halo <strong>{duplicateModalData?.nama}</strong>, identitas email (<code className="font-mono text-stone-800">{duplicateModalData?.email}</code>) atau nomor WhatsApp (<code className="font-mono text-stone-800">{duplicateModalData?.whatsapp}</code>) Anda sudah pernah tercatat pada sistem kami untuk acara ini.
+                  </span>
+                  <div className="p-3 bg-[#FAF9F6] rounded-xl border border-stone-200 text-[11px] text-stone-700 space-y-1">
+                    <div>
+                      Status Pembayaran: <strong className={duplicateModalData?.statusBayar === 'VERIFIED' ? 'text-emerald-800' : 'text-amber-900'}>
+                        {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Terverifikasi (Lunas)' : 'Menunggu Verifikasi Admin'}
+                      </strong>
+                    </div>
+                    <div>
+                      {duplicateModalData?.statusBayar === 'VERIFIED' ? 'Nomor Tiket Resmi:' : 'No. Registrasi Sementara:'}{' '}
+                      <code className="font-mono font-bold text-stone-900">{duplicateModalData?.nomorTicket || duplicateModalData?.id}</code>
+                    </div>
+                  </div>
+                  <span className="block text-[11px] text-stone-500">
+                    {duplicateModalData?.statusBayar === 'VERIFIED'
+                      ? 'Tiket resmi Anda sudah aktif. Anda dapat langsung membuka tanda terima resmi pendaftaran Anda.'
+                      : '⚠️ Tiket resmi acara belum aktif. Bukti transfer terbaru Anda telah kami simpan dan E-Ticket resmi akan diterbitkan setelah pembayaran diverifikasi oleh Admin.'}
+                  </span>
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex-col-reverse sm:flex-row gap-2 pt-2">
+                <AlertDialogCancel
+                  onClick={() => setDuplicateModalOpen(false)}
+                  className="text-xs rounded-xl py-2.5 text-stone-600 hover:text-stone-900 border-stone-200"
+                >
+                  Periksa Kembali Data
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleProceedDuplicateReceipt}
+                  className="text-xs rounded-xl py-2.5 bg-[#0A192F] hover:bg-[#112240] text-white"
+                >
+                  Buka Tanda Terima Pendaftaran ↗
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </>
+          )}
         </AlertDialogContent>
       </AlertDialog>
 
