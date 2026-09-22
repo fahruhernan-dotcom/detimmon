@@ -424,49 +424,57 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 flex flex-col justify-center items-center font-sans">
+    <div className="min-h-screen bg-[#FAF9F6] py-10 px-4 sm:px-6 flex flex-col justify-center items-center font-sans selection:bg-[#0A192F] selection:text-white">
       
-      {/* Top Navigation Bar with Back Affordance */}
-      <div className="w-full max-w-xl flex items-center justify-between mb-3">
+      {/* Top Navigation Bar & Official Intake Badge */}
+      <div className="w-full max-w-xl flex items-center justify-between mb-4">
         <button
           type="button"
           onClick={handleBackToLanding}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 hover:text-slate-950 text-xs font-semibold shadow-2xs transition-all active:scale-95 cursor-pointer"
+          className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/90 hover:bg-white border border-stone-200/90 text-stone-600 hover:text-stone-900 text-xs font-medium shadow-[0_2px_8px_rgba(0,0,0,0.02)] transition-all active:scale-95 cursor-pointer"
           title="Kembali ke Halaman Detail Acara"
         >
-          <ArrowLeft className="w-3.5 h-3.5 text-slate-500" />
+          <ArrowLeft className="w-3.5 h-3.5 text-stone-400 group-hover:-translate-x-0.5 transition-transform" />
           <span>Kembali ke Detail Acara</span>
         </button>
 
-        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-900 text-[11px] font-bold uppercase tracking-wider">
-          <Sparkles className="w-3 h-3 text-amber-600" />
-          <span>Official Intake</span>
+        {/* Monogram Badge Official Intake */}
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/90 border border-stone-200/90 shadow-[0_2px_8px_rgba(0,0,0,0.02)]">
+          <div className="w-4 h-4 rounded-full bg-[#0A192F] flex items-center justify-center text-[8px] font-serif font-bold text-[#D4AF37]">
+            ID
+          </div>
+          <span className="text-[10px] font-mono tracking-widest text-stone-500 uppercase font-semibold">
+            OFFICIAL INTAKE
+          </span>
         </div>
       </div>
 
       {/* Top Brand Bar */}
-      <div className="w-full max-w-xl text-center mb-6">
-        <h1 className="text-xl sm:text-2xl font-bold text-slate-950 tracking-tight">
-          Formulir Pendaftaran Webinar Nasional
+      <div className="w-full max-w-xl text-center mb-7">
+        <span className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold block mb-1.5">
+          LEMBAGA PELATIHAN KERJA INDONESIA DIGNITY
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-normal text-stone-900 font-serif tracking-tight leading-snug">
+          Formulir Pendaftaran Resmi
         </h1>
-        <p className="text-xs text-slate-500 mt-1">
+        <p className="text-xs sm:text-sm text-stone-600 mt-1 font-light max-w-md mx-auto line-clamp-2">
           {eventTitle}
         </p>
       </div>
 
       {/* Loading State Screen */}
       {isLoadingEvent ? (
-        <div className="w-full max-w-xl bg-white rounded-3xl border border-slate-200 shadow-xl p-12 text-center space-y-3 animate-fade-in">
-          <div className="w-8 h-8 border-3 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-semibold text-slate-700">Memuat Formulir Pendaftaran Resmi...</p>
+        <div className="w-full max-w-xl bg-white rounded-3xl border border-stone-200/90 shadow-[0_8px_32px_rgba(10,25,47,0.06)] p-12 text-center space-y-3 animate-fade-in">
+          <div className="w-8 h-8 border-2 border-[#0A192F] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-medium text-stone-600 font-serif">Memuat Formulir Pendaftaran Resmi...</p>
         </div>
       ) : eventNotFound ? (
-        <div className="w-full max-w-xl bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center space-y-4 animate-fade-in">
-          <div className="w-14 h-14 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center mx-auto">
-            <AlertCircle className="w-7 h-7" />
+        <div className="w-full max-w-xl bg-white rounded-3xl border border-stone-200/90 shadow-[0_8px_32px_rgba(10,25,47,0.06)] p-8 text-center space-y-4 animate-fade-in">
+          <div className="w-14 h-14 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center mx-auto">
+            <AlertCircle className="w-7 h-7 stroke-[1.5]" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Acara Tidak Ditemukan</h2>
-          <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+          <h2 className="text-xl font-normal font-serif text-stone-900">Acara Tidak Ditemukan</h2>
+          <p className="text-xs text-stone-600 font-light leading-relaxed max-w-md mx-auto">
             Tautan pendaftaran yang Anda buka tidak ditemukan atau telah kadaluarsa. Silakan periksa kembali tautan Anda atau hubungi Admin LPK Dignity.
           </p>
           <div className="pt-2">
@@ -474,20 +482,20 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
               href="https://wa.me/6289681077483?text=Halo%20Admin%20LPK%20Dignity%2C%20saya%20ingin%20menanyakan%20jadwal%20pelatihan%20terbaru."
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0A192F] hover:bg-[#112240] text-white text-xs font-medium shadow-sm transition-all active:scale-95"
             >
               <span>Hubungi Admin via WhatsApp</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
             </a>
           </div>
         </div>
       ) : !isRegistrationOpen ? (
-        <div className="w-full max-w-xl bg-white rounded-3xl border border-slate-200 shadow-xl p-8 text-center space-y-4 animate-fade-in">
+        <div className="w-full max-w-xl bg-white rounded-3xl border border-stone-200/90 shadow-[0_8px_32px_rgba(10,25,47,0.06)] p-8 text-center space-y-4 animate-fade-in">
           <div className="w-14 h-14 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
-            <Calendar className="w-7 h-7" />
+            <Calendar className="w-7 h-7 stroke-[1.5]" />
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Pendaftaran Ditutup Sementara</h2>
-          <p className="text-xs text-slate-600 leading-relaxed max-w-md mx-auto">
+          <h2 className="text-xl font-normal font-serif text-stone-900">Pendaftaran Ditutup Sementara</h2>
+          <p className="text-xs text-stone-600 font-light leading-relaxed max-w-md mx-auto">
             {webConfig.close_message || "Pendaftaran untuk program ini saat ini ditutup. Pantau batch selanjutnya melalui Instagram @lpkdignity."}
           </p>
           <div className="pt-3">
@@ -495,29 +503,48 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
               href="https://wa.me/6289681077483?text=Halo%20Admin%20LPK%20Dignity%2C%20apakah%20masih%20ada%20slot%20tersisa%20untuk%20webinar%20ini%3F"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-xs"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0A192F] hover:bg-[#112240] text-white text-xs font-medium shadow-sm transition-all active:scale-95"
             >
               <span>Hubungi Admin via WhatsApp</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
             </a>
           </div>
         </div>
       ) : (
       /* Main Wizard Card */
-      <div className="w-full max-w-xl bg-white rounded-3xl border border-slate-200/90 shadow-xl overflow-hidden animate-fade-in">
+      <div className="w-full max-w-xl bg-white rounded-3xl border border-stone-200/90 shadow-[0_12px_40px_rgba(10,25,47,0.06)] overflow-hidden animate-fade-in">
         
-        {/* Step Progress Bar */}
-        <div className="bg-slate-50/80 px-6 py-3 border-b border-slate-100 flex items-center justify-between text-xs">
-          <span className="font-bold text-slate-700">Langkah {step} dari 4</span>
-          <div className="flex items-center gap-1.5">
-            {[1, 2, 3, 4].map(s => (
-              <div 
-                key={s} 
-                className={`h-1.5 rounded-full transition-all ${
-                  step === s ? 'w-6 bg-amber-500' : step > s ? 'w-3 bg-emerald-500' : 'w-3 bg-slate-200'
-                }`}
-              />
-            ))}
+        {/* Step Progress Bar - Quiet Luxury 4-Phases */}
+        <div className="bg-[#FAF9F6] px-6 sm:px-8 py-3.5 border-b border-stone-200/80">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono tracking-wider text-stone-500 uppercase font-semibold">
+              Langkah 0{step} <span className="text-stone-300">/</span> 04
+            </span>
+            <span className="text-xs font-serif text-stone-800 font-medium">
+              {step === 1 && "Pilih Paket & Jadwal"}
+              {step === 2 && "Identitas Peserta"}
+              {step === 3 && "Instruksi Pembayaran"}
+              {step === 4 && "Lampiran Bukti Transfer"}
+              {step === 5 && "Tanda Terima Resmi"}
+            </span>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[1, 2, 3, 4].map(s => {
+              const isDone = step > s;
+              const isCurrent = step === s;
+              return (
+                <div 
+                  key={s} 
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    isCurrent 
+                      ? 'bg-[#0A192F]' 
+                      : isDone 
+                        ? 'bg-stone-800' 
+                        : 'bg-stone-200/80'
+                  }`}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -526,69 +553,98 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
           {/* ── STEP 1: EVENT INFO & PACKAGE SELECTION ───────── */}
           {step === 1 && (
             <div className="space-y-5 animate-fade-in">
-              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2">
-                <div className="text-xs font-bold text-amber-950 uppercase tracking-wider">Jadwal & Lokasi Pelaksanaan:</div>
-                <div className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-amber-700 shrink-0" />
-                  <span>{eventDate}</span>
+              {/* Executive Dossier: Event Schedule & Venue */}
+              <div className="p-5 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 space-y-3">
+                <div className="flex items-center justify-between border-b border-stone-200/60 pb-2.5">
+                  <span className="text-[10px] font-mono tracking-widest text-stone-500 uppercase font-semibold">
+                    JADWAL & LOKASI PELAKSANAAN
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-stone-200 text-stone-600">
+                    {isWebinar ? 'LIVE WEBINAR' : 'OFFLINE BOOTCAMP'}
+                  </span>
                 </div>
-                <div className="text-xs text-slate-600 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-700 shrink-0" />
-                  <span>{eventTime}</span>
-                </div>
-                <div className="text-xs text-slate-600 flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-amber-700 shrink-0" />
-                  <span>{eventVenue}</span>
+                <div className="space-y-2">
+                  <div className="text-sm font-semibold text-stone-900 flex items-center gap-2.5">
+                    <Calendar className="w-4 h-4 text-stone-600 shrink-0 stroke-[1.5]" />
+                    <span>{eventDate}</span>
+                  </div>
+                  <div className="text-xs text-stone-600 flex items-center gap-2.5 font-light">
+                    <Clock className="w-4 h-4 text-stone-500 shrink-0 stroke-[1.5]" />
+                    <span>{eventTime}</span>
+                  </div>
+                  <div className="text-xs text-stone-600 flex items-center gap-2.5 font-light">
+                    <MapPin className="w-4 h-4 text-stone-500 shrink-0 stroke-[1.5]" />
+                    <span>{eventVenue}</span>
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-2.5">
-                  Pilih Paket Pendaftaran:
+                <label className="text-[10px] font-mono tracking-widest text-stone-400 uppercase font-semibold block mb-2.5">
+                  PILIH PAKET PENDAFTARAN:
                 </label>
                 <div className={`grid grid-cols-1 ${webConfig.allow_mabar ? 'sm:grid-cols-2' : ''} gap-3`}>
                   
                   {/* Paket Individu */}
                   <div
                     onClick={() => setPackageType('INDIVIDU')}
-                    className={`p-4 rounded-2xl border-2 transition-all cursor-pointer space-y-1.5 ${
+                    className={`p-4 rounded-2xl transition-all cursor-pointer space-y-2 ${
                       packageType === 'INDIVIDU'
-                        ? 'border-amber-500 bg-amber-50/20 shadow-2xs'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                        ? 'border-2 border-[#0A192F] bg-[#FAF9F6] shadow-[0_4px_16px_rgba(10,25,47,0.06)] ring-1 ring-[#0A192F]/10'
+                        : 'border border-stone-200/90 hover:border-stone-300 hover:bg-[#FAF9F6]/40 bg-white'
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-900">Tiket Individu</span>
-                      <User className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-semibold text-stone-900">Tiket Individu</span>
+                      {packageType === 'INDIVIDU' ? (
+                        <span className="inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#0A192F] text-white">
+                          <Check className="w-2.5 h-2.5 text-[#D4AF37]" /> Dipilih
+                        </span>
+                      ) : (
+                        <User className="w-4 h-4 text-stone-400 stroke-[1.5]" />
+                      )}
                     </div>
-                    <div className="text-lg font-bold font-mono text-slate-950">
+                    <div className="text-xl font-normal font-serif text-stone-900">
                       {formatRupiah(currentEvent?.promo_price || currentEvent?.base_price || 100000)}
                     </div>
-                    <p className="text-[11px] text-slate-500">Akses penuh pelatihan, e-sertifikat resmi & materi</p>
+                    <p className="text-[11px] text-stone-500 font-light leading-relaxed">
+                      Akses penuh bimbingan materi, e-sertifikat resmi, dan e-workbook.
+                    </p>
                   </div>
 
                   {/* Paket Promo Rombongan (Mabar) Dinamis */}
                   {webConfig.allow_mabar && (
                     <div
                       onClick={() => setPackageType(groupPackageKey)}
-                      className={`p-4 rounded-2xl border-2 transition-all cursor-pointer space-y-1.5 ${
+                      className={`p-4 rounded-2xl transition-all cursor-pointer space-y-2 ${
                         isGroupPackage
-                          ? 'border-amber-500 bg-amber-50/20 shadow-2xs'
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
+                          ? 'border-2 border-[#0A192F] bg-[#FAF9F6] shadow-[0_4px_16px_rgba(10,25,47,0.06)] ring-1 ring-[#0A192F]/10'
+                          : 'border border-stone-200/90 hover:border-stone-300 hover:bg-[#FAF9F6]/40 bg-white'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-900">
-                          {isWebinar ? 'Promo Komunitas (10+1 Gratis)' : 'Promo Rombongan (5+1 Gratis)'}
+                        <span className="text-xs font-semibold text-stone-900">
+                          {isWebinar ? 'Promo Komunitas (10+1)' : 'Promo Rombongan (5+1)'}
                         </span>
-                        <Users className="w-4 h-4 text-amber-600" />
+                        {isGroupPackage ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-mono px-2 py-0.5 rounded-full bg-[#0A192F] text-white">
+                            <Check className="w-2.5 h-2.5 text-[#D4AF37]" /> Dipilih
+                          </span>
+                        ) : (
+                          <Users className="w-4 h-4 text-stone-400 stroke-[1.5]" />
+                        )}
                       </div>
-                      <div className="text-lg font-bold font-mono text-emerald-800">
+                      <div className="text-xl font-normal font-serif text-emerald-800">
                         {formatRupiah(groupPrice)}
                       </div>
-                      <p className="text-[11px] text-emerald-700 font-medium">
-                        Hemat {formatRupiah(singlePrice)}! Bayar {groupPaidCount} tiket untuk total {groupTotalPax} peserta.
-                      </p>
+                      <div className="space-y-1">
+                        <div className="inline-block text-[10px] font-mono font-medium px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200/80">
+                          Bonus 1 Tiket Gratis (Total {groupTotalPax} Pax)
+                        </div>
+                        <p className="text-[11px] text-stone-500 font-light leading-relaxed">
+                          Hemat {formatRupiah(singlePrice)}! Bayar {groupPaidCount} tiket untuk {groupTotalPax} peserta.
+                        </p>
+                      </div>
                     </div>
                   )}
 
@@ -597,23 +653,23 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
 
               {/* ── Voucher Rebate Input ── */}
               <div className="space-y-2">
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-400 block">
-                  Kode Voucher Rebate Alumni (Opsional):
+                <label className="text-[10px] font-mono uppercase tracking-widest text-stone-400 font-semibold block">
+                  KODE VOUCHER REBATE ALUMNI (OPSIONAL):
                 </label>
 
                 {appliedVoucher ? (
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-50 border border-emerald-300">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl bg-emerald-50/80 border border-emerald-200/90">
+                    <div className="flex items-center gap-2.5">
                       <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                       <div>
-                        <p className="text-xs font-bold text-emerald-900">Voucher Aktif: {voucherInput}</p>
-                        <p className="text-[11px] text-emerald-700">Potongan {formatRupiah(appliedVoucher.discount_applied)} — {appliedVoucher.message}</p>
+                        <p className="text-xs font-medium text-emerald-950">Voucher Aktif: <strong className="font-mono">{voucherInput}</strong></p>
+                        <p className="text-[11px] text-emerald-700 font-light">Potongan {formatRupiah(appliedVoucher.discount_applied)} — {appliedVoucher.message}</p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleRemoveVoucher}
-                      className="text-[10px] font-bold text-rose-600 hover:text-rose-800 px-2 py-1 rounded-lg hover:bg-rose-50 transition-colors"
+                      className="text-[10px] font-mono uppercase tracking-wider text-rose-600 hover:text-rose-800 px-2.5 py-1 rounded-lg hover:bg-rose-50 transition-colors"
                     >
                       Hapus
                     </button>
@@ -622,46 +678,48 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                   <div className="flex gap-2">
                     <input
                       type="text"
-                      placeholder="Contoh: REBATE100K-ALUMNI"
+                      placeholder="CONTOH: REBATE100K-ALUMNI"
                       value={voucherInput}
                       onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
                       onKeyDown={(e) => e.key === 'Enter' && handleApplyVoucher()}
-                      className="flex-1 px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-amber-500 focus:bg-white font-mono uppercase"
+                      className="flex-1 px-3.5 py-2.5 text-xs rounded-xl border border-stone-200/90 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white focus:ring-1 focus:ring-stone-400 font-mono uppercase text-stone-900 placeholder:text-stone-400 transition-all"
                     />
                     <button
                       type="button"
                       onClick={handleApplyVoucher}
                       disabled={voucherValidating}
-                      className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-xs font-bold transition-colors"
+                      className="px-4 py-2.5 rounded-xl bg-[#0A192F] hover:bg-[#112240] disabled:opacity-50 text-white text-xs font-medium tracking-wide active:scale-95 transition-all cursor-pointer"
                     >
-                      {voucherValidating ? '...' : 'Terapkan'}
+                      {voucherValidating ? 'Memvalidasi...' : 'Terapkan'}
                     </button>
                   </div>
                 )}
 
                 {voucherError && (
-                  <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1">
+                  <p className="text-[11px] text-rose-600 font-medium flex items-center gap-1.5">
                     <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                    {voucherError}
+                    <span>{voucherError}</span>
                   </p>
                 )}
               </div>
 
+              {/* Step 1 Actions */}
               <div className="flex items-center gap-3 pt-2">
                 <button
                   type="button"
                   onClick={handleBackToLanding}
-                  className="px-4 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-5 py-3 rounded-xl text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200/90 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <ArrowLeft className="w-3.5 h-3.5 text-stone-400" />
                   <span>Kembali</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setStep(2)}
-                  className="flex-1 py-3 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-2xs active:scale-[0.99] cursor-pointer"
+                  className="flex-1 py-3 px-5 rounded-xl text-xs sm:text-sm font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(10,25,47,0.12)] active:scale-[0.98] cursor-pointer tracking-wide"
                 >
                   <span>Lanjutkan Isi Data Peserta</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
                 </button>
               </div>
             </div>
@@ -670,129 +728,147 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
           {/* ── STEP 2: PARTICIPANT IDENTITY DETAILS ─────────── */}
           {step === 2 && (
             <div className="space-y-4 animate-fade-in text-xs">
-              <h3 className="text-sm font-bold text-slate-900">Identitas Pendaftar Utama</h3>
+              <div className="border-b border-stone-200/80 pb-2.5">
+                <h3 className="text-base font-normal font-serif text-stone-900">Identitas Pendaftar Utama</h3>
+                <p className="text-[11px] text-stone-500 font-light mt-0.5">Pastikan ejaan nama sesuai untuk pencetakan e-sertifikat resmi.</p>
+              </div>
               
               <div>
-                <label className="text-slate-600 font-medium block mb-1">Nama Lengkap & Gelar (Untuk Sertifikat):</label>
+                <label className="text-[10.5px] font-mono uppercase tracking-wider text-stone-500 font-medium block mb-1.5">
+                  Nama Lengkap & Gelar (Untuk Sertifikat):
+                </label>
                 <input
                   type="text"
-                  placeholder="Contoh: Budi Santoso, S.Kom."
+                  placeholder="Contoh: dr. Budi Santoso, Sp.A / Siti Rahma, S.Tr.Keb."
                   value={primaryData.nama}
                   onChange={(e) => setPrimaryData({ ...primaryData, nama: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-amber-500 focus:bg-white"
+                  className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-200/90 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white focus:ring-1 focus:ring-stone-400 text-stone-900 placeholder:text-stone-400 transition-all"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-600 font-medium block mb-1">Alamat Email Aktif:</label>
+                  <label className="text-[10.5px] font-mono uppercase tracking-wider text-stone-500 font-medium block mb-1.5">
+                    Alamat Email Aktif:
+                  </label>
                   <input
                     type="email"
-                    placeholder="nama@gmail.com"
+                    placeholder="nama@email.com"
                     value={primaryData.email}
                     onChange={(e) => setPrimaryData({ ...primaryData, email: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-amber-500 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-200/90 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white focus:ring-1 focus:ring-stone-400 text-stone-900 placeholder:text-stone-400 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-600 font-medium block mb-1">Nomor WhatsApp Aktif:</label>
+                  <label className="text-[10.5px] font-mono uppercase tracking-wider text-stone-500 font-medium block mb-1.5">
+                    Nomor WhatsApp Aktif:
+                  </label>
                   <input
                     type="tel"
                     placeholder="08123456789"
                     value={primaryData.whatsapp}
                     onChange={(e) => setPrimaryData({ ...primaryData, whatsapp: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-amber-500 focus:bg-white font-mono"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-200/90 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white focus:ring-1 focus:ring-stone-400 font-mono text-stone-900 placeholder:text-stone-400 transition-all"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-slate-600 font-medium block mb-1">Instansi / Kampus / Perusahaan:</label>
+                  <label className="text-[10.5px] font-mono uppercase tracking-wider text-stone-500 font-medium block mb-1.5">
+                    Instansi / Perusahaan / Kampus:
+                  </label>
                   <input
                     type="text"
-                    placeholder="Contoh: Universitas Sebelas Maret"
+                    placeholder="Contoh: RSUD Moewardi / Poltekkes"
                     value={primaryData.instansi}
                     onChange={(e) => setPrimaryData({ ...primaryData, instansi: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-amber-500 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-200/90 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white focus:ring-1 focus:ring-stone-400 text-stone-900 placeholder:text-stone-400 transition-all"
                   />
                 </div>
                 <div>
-                  <label className="text-slate-600 font-medium block mb-1">Kota Domisili:</label>
+                  <label className="text-[10.5px] font-mono uppercase tracking-wider text-stone-500 font-medium block mb-1.5">
+                    Kota Domisili:
+                  </label>
                   <input
                     type="text"
                     placeholder="Contoh: Surakarta"
                     value={primaryData.kota}
                     onChange={(e) => setPrimaryData({ ...primaryData, kota: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 bg-slate-50/50 outline-none focus:border-amber-500 focus:bg-white"
+                    className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-stone-200/90 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white focus:ring-1 focus:ring-stone-400 text-stone-900 placeholder:text-stone-400 transition-all"
                   />
                 </div>
               </div>
 
               {/* If Group / MABAR, show dynamic members form */}
               {isGroupPackage && (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3 pt-3">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-800 block">
-                      Daftar {groupAdditionalCount} Anggota Tambahan (Total {groupTotalPax} Peserta):
+                <div className="p-4 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 space-y-3 pt-3.5">
+                  <div className="flex items-center justify-between border-b border-stone-200/60 pb-2">
+                    <span className="font-semibold text-stone-800 text-xs">
+                      Daftar {groupAdditionalCount} Anggota Tambahan (Total {groupTotalPax} Peserta)
                     </span>
-                    <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 font-medium border border-emerald-200">
                       Bonus 1 Gratis
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Pendaftar utama di atas dihitung sebagai Peserta #1. Mohon lengkapi data {groupAdditionalCount} peserta lainnya:
+                  <p className="text-[11px] text-stone-500 font-light leading-relaxed">
+                    Pendaftar utama di atas dihitung sebagai Peserta #1. Mohon lengkapi data anggota kelompok Anda:
                   </p>
-                  {mabarMembers.slice(0, groupAdditionalCount).map((m, idx) => (
-                    <div key={idx} className="p-2.5 rounded-xl bg-white border border-slate-200 space-y-2">
-                      <div className="font-semibold text-slate-700 flex items-center justify-between text-[11px]">
-                        <span>Anggota #{idx + 2}</span>
-                        {idx === groupAdditionalCount - 1 && (
-                          <span className="text-emerald-700 font-bold text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                            Tiket Bonus Gratis
-                          </span>
-                        )}
+                  <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                    {mabarMembers.slice(0, groupAdditionalCount).map((m, idx) => (
+                      <div key={idx} className="p-3 rounded-xl bg-white border border-stone-200/80 space-y-2 shadow-2xs">
+                        <div className="font-medium text-stone-700 flex items-center justify-between text-[11px]">
+                          <span>Anggota #{idx + 2}</span>
+                          {idx === groupAdditionalCount - 1 && (
+                            <span className="text-emerald-700 font-medium text-[10px] bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 font-mono">
+                              Tiket Bonus Gratis
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <input
+                            type="text"
+                            placeholder="Nama Lengkap & Gelar"
+                            value={m.nama}
+                            onChange={(e) => handleUpdateMember(idx, 'nama', e.target.value)}
+                            className="px-2.5 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white text-stone-900"
+                          />
+                          <input
+                            type="tel"
+                            placeholder="Nomor WhatsApp"
+                            value={m.whatsapp}
+                            onChange={(e) => handleUpdateMember(idx, 'whatsapp', e.target.value)}
+                            className="px-2.5 py-2 text-xs rounded-lg border border-stone-200 bg-[#FAF9F6] outline-none focus:border-stone-400 focus:bg-white font-mono text-stone-900"
+                          />
+                        </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        <input
-                          type="text"
-                          placeholder="Nama Lengkap Sesuai Sertifikat"
-                          value={m.nama}
-                          onChange={(e) => handleUpdateMember(idx, 'nama', e.target.value)}
-                          className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 outline-none focus:border-amber-500"
-                        />
-                        <input
-                          type="tel"
-                          placeholder="Nomor WhatsApp"
-                          value={m.whatsapp}
-                          onChange={(e) => handleUpdateMember(idx, 'whatsapp', e.target.value)}
-                          className="px-2.5 py-1.5 text-xs rounded-lg border border-slate-200 outline-none focus:border-amber-500 font-mono"
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-3">
                 <button
+                  type="button"
                   onClick={() => setStep(1)}
-                  className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                  className="px-5 py-3 rounded-xl text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200/90 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  Kembali
+                  <ArrowLeft className="w-3.5 h-3.5 text-stone-400" />
+                  <span>Kembali</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
                     if (!primaryData.nama || !primaryData.email || !primaryData.whatsapp) {
-                      alert('Mohon isi nama, email, dan WhatsApp Anda.');
+                      alert('Mohon isi nama lengkap, alamat email, dan nomor WhatsApp Anda.');
                       return;
                     }
                     setStep(3);
                   }}
-                  className="flex-1 py-3 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-2xs"
+                  className="flex-1 py-3 px-5 rounded-xl text-xs sm:text-sm font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(10,25,47,0.12)] active:scale-[0.98] cursor-pointer tracking-wide"
                 >
                   <span>Lanjut ke Pembayaran</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
                 </button>
               </div>
             </div>
@@ -801,35 +877,43 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
           {/* ── STEP 3: PAYMENT INSTRUCTIONS ─────────────────── */}
           {step === 3 && (
             <div className="space-y-4 animate-fade-in text-xs">
-              <h3 className="text-sm font-bold text-slate-900">Instruksi Pembayaran Resmi</h3>
+              <div className="border-b border-stone-200/80 pb-2.5">
+                <h3 className="text-base font-normal font-serif text-stone-900">Instruksi Pembayaran Resmi</h3>
+                <p className="text-[11px] text-stone-500 font-light mt-0.5">Transfer dilakukan ke rekening resmi lembaga berbadan hukum LPK Indonesia Dignity.</p>
+              </div>
 
-              {/* Total Due Card — with voucher breakdown if applicable */}
-              <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 space-y-2">
+              {/* Total Due Card Dossier */}
+              <div className="p-5 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 space-y-3 shadow-2xs">
                 {appliedVoucher && packageType === 'INDIVIDU' ? (
                   <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-slate-500">Harga Normal:</span>
-                      <span className="font-mono text-slate-600 line-through">{formatRupiah(basePrice)}</span>
+                    <div className="flex items-center justify-between text-stone-600">
+                      <span className="text-[11px] font-light">Investasi Normal:</span>
+                      <span className="font-mono line-through text-stone-400">{formatRupiah(basePrice)}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Voucher {appliedVoucher.code}:
+                    <div className="flex items-center justify-between text-emerald-800 font-medium">
+                      <span className="text-[11px] flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        Voucher Rebate ({appliedVoucher.code}):
                       </span>
-                      <span className="font-mono font-bold text-emerald-700">- {formatRupiah(appliedVoucher.discount)}</span>
+                      <span className="font-mono font-bold">- {formatRupiah(appliedVoucher.discount)}</span>
                     </div>
-                    <div className="pt-1.5 border-t border-amber-200 flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider">Total Wajib Transfer:</span>
-                      <div className="text-xl font-bold font-mono text-slate-950">{formatRupiah(priceAmount)}</div>
+                    <div className="pt-2 border-t border-stone-200/80 flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-stone-500 font-semibold block">TOTAL WAJIB TRANSFER:</span>
+                        <div className="text-2xl font-normal font-serif text-stone-900 mt-0.5">{formatRupiah(priceAmount)}</div>
+                      </div>
+                      <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white border border-stone-200 text-stone-700">
+                        Tiket Individu
+                      </span>
                     </div>
                   </>
                 ) : (
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">Total Tagihan:</span>
-                      <div className="text-xl font-bold font-mono text-slate-950 mt-0.5">{formatRupiah(priceAmount)}</div>
+                      <span className="text-[10px] font-mono uppercase tracking-widest text-stone-500 font-semibold block">TOTAL TAGIHAN TRANSFER:</span>
+                      <div className="text-2xl font-normal font-serif text-stone-900 mt-0.5">{formatRupiah(priceAmount)}</div>
                     </div>
-                    <span className="text-xs font-semibold text-slate-600 bg-white px-2.5 py-1 rounded-lg border border-amber-200">
+                    <span className="text-[10px] font-mono px-2.5 py-1 rounded bg-white border border-stone-200 text-stone-700">
                       {isGroupPackage ? (isWebinar ? `Promo Komunitas (${groupTotalPax} Pax)` : `Promo Rombongan (${groupTotalPax} Pax)`) : 'Tiket Individu'}
                     </span>
                   </div>
@@ -837,9 +921,9 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
               </div>
 
               {/* Bank Transfer Details */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Pilihan Rekening Transfer Resmi LPK Indonesia Dignity:
+              <div className="space-y-2.5">
+                <span className="text-[10px] font-mono uppercase tracking-widest text-stone-400 font-semibold block">
+                  PILIHAN REKENING BANK RESMI TUJUAN:
                 </span>
                 
                 {webConfig.banks && webConfig.banks.length > 0 ? (
@@ -847,21 +931,23 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                     <div 
                       key={bIdx}
                       onClick={() => setPrimaryData(d => ({ ...d, bank: b.bank_name }))}
-                      className={`p-3.5 rounded-xl border transition cursor-pointer flex items-center justify-between ${
+                      className={`p-4 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
                         primaryData.bank === b.bank_name 
-                          ? 'border-amber-500 bg-white ring-2 ring-amber-500/20' 
-                          : 'border-slate-200 bg-white hover:border-slate-300'
+                          ? 'border-2 border-[#0A192F] bg-white ring-1 ring-[#0A192F]/10 shadow-xs' 
+                          : 'border border-stone-200/90 bg-[#FAF9F6] hover:bg-white hover:border-stone-300'
                       }`}
                     >
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <strong className="text-slate-900 block text-xs">{b.bank_name}</strong>
+                        <div className="flex items-center gap-2">
+                          <strong className="text-stone-900 block text-xs">{b.bank_name}</strong>
                           {primaryData.bank === b.bank_name && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">Dipilih</span>
+                            <span className="text-[9px] font-mono font-semibold px-2 py-0.5 rounded-full bg-[#0A192F] text-white">
+                              Dipilih
+                            </span>
                           )}
                         </div>
-                        <code className="text-sm font-mono font-bold text-amber-900 block mt-0.5">{b.account_number}</code>
-                        <span className="text-[11px] text-slate-500 block">a.n. {b.account_holder}</span>
+                        <code className="text-sm font-mono font-bold text-stone-900 block mt-1">{b.account_number}</code>
+                        <span className="text-[11px] text-stone-500 font-light block mt-0.5">a.n. {b.account_holder}</span>
                       </div>
                       <button
                         type="button"
@@ -869,7 +955,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                           e.stopPropagation();
                           handleCopyAccount(b.account_number);
                         }}
-                        className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                        className="p-2.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 transition-all active:scale-95 cursor-pointer"
                         title="Salin nomor rekening"
                       >
                         {copiedAccount ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
@@ -877,36 +963,38 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                     </div>
                   ))
                 ) : (
-                  <div className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                  <div className="p-4 bg-white rounded-xl border border-stone-200 flex items-center justify-between shadow-2xs">
                     <div>
-                      <strong className="text-slate-900 block">Bank Mandiri</strong>
-                      <code className="text-sm font-mono font-bold text-slate-800">138-00-2455891-2</code>
-                      <span className="text-[11px] text-slate-500 block">a.n. LPK INDONESIA DIGNITY</span>
+                      <strong className="text-stone-900 block text-xs">Bank Mandiri</strong>
+                      <code className="text-sm font-mono font-bold text-stone-900 block mt-1">138-00-2455891-2</code>
+                      <span className="text-[11px] text-stone-500 font-light block mt-0.5">a.n. LPK INDONESIA DIGNITY</span>
                     </div>
                     <button
                       onClick={() => handleCopyAccount('1380024558912')}
-                      className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors"
+                      className="p-2.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 transition-all active:scale-95 cursor-pointer"
                     >
                       <Copy className="w-4 h-4" />
                     </button>
                   </div>
                 )}
-
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-3">
                 <button
+                  type="button"
                   onClick={() => setStep(2)}
-                  className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                  className="px-5 py-3 rounded-xl text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200/90 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  Kembali
+                  <ArrowLeft className="w-3.5 h-3.5 text-stone-400" />
+                  <span>Kembali</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => setStep(4)}
-                  className="flex-1 py-3 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-2xs"
+                  className="flex-1 py-3 px-5 rounded-xl text-xs sm:text-sm font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(10,25,47,0.12)] active:scale-[0.98] cursor-pointer tracking-wide"
                 >
                   <span>Saya Sudah Transfer (Konfirmasi)</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-3.5 h-3.5 text-[#D4AF37]" />
                 </button>
               </div>
             </div>
@@ -915,50 +1003,53 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
           {/* ── STEP 4: CONFIRMATION & SUBMIT ─────────────────── */}
           {step === 4 && (
             <div className="space-y-4 animate-fade-in text-xs">
-              <h3 className="text-sm font-bold text-slate-900">Konfirmasi Bukti Pembayaran</h3>
+              <div className="border-b border-stone-200/80 pb-2.5">
+                <h3 className="text-base font-normal font-serif text-stone-900">Konfirmasi Bukti Pembayaran</h3>
+                <p className="text-[11px] text-stone-500 font-light mt-0.5">Lampirkan foto struk m-banking atau tautan bukti transfer Anda.</p>
+              </div>
               
-              {/* Pilihan Metode Lampiran: Upload Foto vs Google Drive Link */}
-              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-2xl border border-slate-200">
+              {/* Pilihan Metode Lampiran: Segmented Control */}
+              <div className="grid grid-cols-2 gap-1 p-1 bg-stone-100 rounded-xl border border-stone-200/80">
                 <button
                   type="button"
                   onClick={() => setProofMethod('UPLOAD')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     proofMethod === 'UPLOAD'
-                      ? 'bg-white text-slate-950 shadow-xs border border-slate-200'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-stone-900 shadow-xs border border-stone-200/90'
+                      : 'text-stone-600 hover:text-stone-900'
                   }`}
                 >
-                  <Upload className="w-3.5 h-3.5 text-amber-600" />
+                  <Upload className="w-3.5 h-3.5 text-[#0A192F]" />
                   <span>Upload Foto (Instan)</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setProofMethod('GDRIVE')}
-                  className={`py-2 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  className={`py-2 px-3 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                     proofMethod === 'GDRIVE'
-                      ? 'bg-white text-slate-950 shadow-xs border border-slate-200'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-stone-900 shadow-xs border border-stone-200/90'
+                      : 'text-stone-600 hover:text-stone-900'
                   }`}
                 >
-                  <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
+                  <ExternalLink className="w-3.5 h-3.5 text-[#0A192F]" />
                   <span>Link Google Drive</span>
                 </button>
               </div>
 
               {/* Box Input Berdasarkan Metode */}
               {proofMethod === 'GDRIVE' ? (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="p-4 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 space-y-3">
                   <div className="text-left space-y-1">
-                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <ExternalLink className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Tautan Google Drive Bukti Transfer</span>
+                    <label className="text-[10.5px] font-mono uppercase tracking-wider text-stone-600 font-medium flex items-center gap-1.5">
+                      <ExternalLink className="w-3.5 h-3.5 text-stone-500" />
+                      <span>TAUTAN GOOGLE DRIVE BUKTI TRANSFER:</span>
                     </label>
-                    <div className="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 text-[11px] text-amber-900 leading-relaxed flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 text-[11px] text-amber-950 leading-relaxed flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                       <div>
-                        <p className="font-bold text-amber-950">Penting: Buka Izin Akses Berkas</p>
-                        <p className="text-amber-800 mt-0.5">
-                          Pastikan hak akses berkas di Google Drive telah disetel ke <strong>"Siapa saja yang memiliki link dapat melihat" (Anyone with the link can view)</strong> agar admin finance dapat memverifikasi pembayaran Anda dalam &lt;15 detik.
+                        <p className="font-semibold text-amber-950">Penting: Buka Izin Akses Berkas</p>
+                        <p className="text-amber-900/80 mt-0.5 font-light">
+                          Pastikan hak akses berkas di Google Drive telah disetel ke <strong>"Siapa saja yang memiliki link dapat melihat"</strong> agar verifikasi berlangsung instan.
                         </p>
                       </div>
                     </div>
@@ -968,7 +1059,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                     placeholder="https://drive.google.com/file/d/.../view?usp=sharing"
                     value={proofDriveUrl}
                     onChange={(e) => setProofDriveUrl(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-xs font-mono focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none bg-white text-slate-800"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200/90 text-xs font-mono focus:border-stone-400 focus:ring-1 focus:ring-stone-400 outline-none bg-white text-stone-900"
                   />
                   {proofDriveUrl.trim() && (
                     <div className="flex items-center gap-2 text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl">
@@ -978,10 +1069,10 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                   )}
                 </div>
               ) : (
-                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-center space-y-3">
+                <div className="p-5 rounded-2xl bg-[#FAF9F6] border-2 border-dashed border-stone-300 hover:border-stone-400 text-center space-y-3 transition-colors">
                   {proofPreview ? (
                     <div className="space-y-3">
-                      <div className="relative inline-block border border-slate-200 rounded-xl overflow-hidden shadow-xs bg-white max-h-48 max-w-full">
+                      <div className="relative inline-block border border-stone-200 rounded-xl overflow-hidden shadow-xs bg-white max-h-48 max-w-full">
                         <img
                           src={proofPreview}
                           alt="Bukti Transfer"
@@ -989,7 +1080,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                         />
                       </div>
                       <div className="flex items-center justify-center gap-2">
-                        <span className="text-xs font-semibold text-slate-700 truncate max-w-xs">
+                        <span className="text-xs font-medium text-stone-700 truncate max-w-xs">
                           📎 {proofFile?.name || 'Bukti Transfer Terlampir'}
                         </span>
                         <button
@@ -998,7 +1089,7 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                             setProofFile(null);
                             setProofPreview(null);
                           }}
-                          className="text-[11px] font-bold text-rose-600 hover:text-rose-700 underline ml-2"
+                          className="text-[11px] font-medium text-rose-600 hover:text-rose-700 underline ml-2 cursor-pointer"
                         >
                           Hapus
                         </button>
@@ -1006,11 +1097,15 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                     </div>
                   ) : (
                     <>
-                      <Upload className="w-8 h-8 mx-auto text-slate-400" />
-                      <span className="font-bold text-slate-800 block">Upload Struk Transfer (Disarankan)</span>
-                      <p className="text-[11px] text-slate-500 max-w-sm mx-auto">
-                        Lampirkan tangkapan layar / foto bukti transfer bank Anda agar verifikasi tiket berlangsung otomatis.
-                      </p>
+                      <div className="w-10 h-10 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center mx-auto">
+                        <Upload className="w-5 h-5 stroke-[1.5]" />
+                      </div>
+                      <div>
+                        <span className="font-medium text-stone-900 block text-xs">Upload Struk Transfer (Disarankan)</span>
+                        <p className="text-[11px] text-stone-500 font-light max-w-sm mx-auto mt-0.5">
+                          Lampirkan tangkapan layar / foto bukti transfer bank Anda untuk verifikasi tiket otomatis.
+                        </p>
+                      </div>
                       <input
                         type="file"
                         accept="image/*"
@@ -1025,31 +1120,34 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                             setProofPreview(null);
                           }
                         }}
-                        className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-800 hover:file:bg-amber-100"
+                        className="text-xs text-stone-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-[#0A192F] file:text-white hover:file:bg-[#112240] cursor-pointer"
                       />
                     </>
                   )}
                 </div>
               )}
 
-              <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs flex items-center gap-2">
+              <div className="p-3 rounded-xl bg-stone-50 border border-stone-200/90 text-stone-600 text-xs flex items-center gap-2.5 font-light">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Pendaftaran Anda dilindungi enkripsi aman dan nomor tiket akan segera diterbitkan.</span>
+                <span>Pendaftaran Anda dilindungi enkripsi aman dan nomor tiket resmi akan segera diterbitkan.</span>
               </div>
 
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex items-center gap-3 pt-3">
                 <button
+                  type="button"
                   onClick={() => setStep(3)}
-                  className="px-4 py-2.5 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                  className="px-5 py-3 rounded-xl text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200/90 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
                 >
-                  Kembali
+                  <ArrowLeft className="w-3.5 h-3.5 text-stone-400" />
+                  <span>Kembali</span>
                 </button>
                 <button
+                  type="button"
                   onClick={handleSubmitRegistration}
                   disabled={isSubmitting}
-                  className="flex-1 py-3 rounded-2xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 transition-all flex items-center justify-center gap-2 shadow-2xs disabled:opacity-50"
+                  className="flex-1 py-3.5 px-5 rounded-xl text-xs sm:text-sm font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all flex items-center justify-center gap-2 shadow-[0_4px_16px_rgba(10,25,47,0.15)] disabled:opacity-50 active:scale-[0.98] cursor-pointer tracking-wide"
                 >
-                  <Send className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 text-[#D4AF37]" />
                   <span>{isSubmitting ? 'Memproses Pendaftaran...' : 'Kirim Pendaftaran Sekarang'}</span>
                 </button>
               </div>
@@ -1059,106 +1157,108 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
           {/* ── STEP 5: SUCCESS RECEIPT ───────────────────────── */}
           {step === 5 && registeredResult && (
             <div className="space-y-5 animate-fade-in text-center py-4">
-              <div className="w-14 h-14 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="w-8 h-8" />
+              <div className="w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-8 h-8 stroke-[1.5]" />
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-slate-900">Pendaftaran Berhasil Dikirim!</h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto leading-relaxed">
+                <h3 className="text-xl sm:text-2xl font-normal font-serif text-stone-900">Pendaftaran Berhasil Dikirim!</h3>
+                <p className="text-xs text-stone-500 font-light mt-1 max-w-sm mx-auto leading-relaxed">
                   {webConfig.success_message || "Pendaftaran berhasil dicatat! Tiket & tautan akses webinar akan dikirimkan otomatis setelah verifikasi pembayaran oleh Admin."}
                 </p>
               </div>
 
               {/* Duplicate Notice Banner if previously registered */}
               {registeredResult.isDuplicate && (
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-left space-y-1 text-xs text-amber-900">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/90 text-left space-y-1 text-xs text-amber-950">
+                  <div className="flex items-center gap-1.5 font-semibold">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
                     <span>Pendaftaran Sebelumnya Terdeteksi</span>
                   </div>
-                  <p className="text-[11.5px] leading-relaxed">
+                  <p className="text-[11.5px] font-light leading-relaxed">
                     {registeredResult.duplicateMessage || "Data nama/email/nomor WhatsApp Anda sudah pernah tercatat pada sistem kami untuk acara ini."}
                   </p>
                 </div>
               )}
 
-              {/* Official Ticket Box */}
-              <div className="p-3.5 bg-white rounded-2xl border-2 border-amber-400/80 shadow-xs flex items-center justify-between text-left">
+              {/* Official Ticket Box - Quiet Luxury Dossier */}
+              <div className="p-4.5 bg-[#FAF9F6] rounded-2xl border-2 border-[#0A192F] shadow-xs flex items-center justify-between text-left">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-amber-900 tracking-wider block">Nomor E-Ticket Resmi:</span>
-                  <strong className="font-mono text-base text-slate-950 font-bold tracking-tight">
+                  <span className="text-[10px] uppercase font-mono tracking-widest text-stone-500 font-semibold block">
+                    NOMOR E-TICKET RESMI:
+                  </span>
+                  <strong className="font-mono text-base sm:text-lg text-stone-900 font-bold tracking-tight block mt-0.5">
                     {registeredResult.nomorTicket || registeredResult.id}
                   </strong>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600">
-                  <Ticket className="w-5 h-5" />
+                <div className="w-10 h-10 rounded-xl bg-white border border-stone-200 flex items-center justify-center text-[#0A192F] shadow-2xs">
+                  <Ticket className="w-5 h-5 stroke-[1.5]" />
                 </div>
               </div>
 
               {/* Receipt Card */}
-              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-left space-y-2 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500">Nama Peserta:</span>
-                  <strong className="text-slate-900">{registeredResult.nama}</strong>
+              <div className="p-5 rounded-2xl bg-white border border-stone-200/90 text-left space-y-2.5 text-xs shadow-2xs">
+                <div className="flex items-center justify-between border-b border-stone-200/60 pb-2">
+                  <span className="text-stone-500 font-light">Nama Peserta:</span>
+                  <strong className="text-stone-900 font-medium">{registeredResult.nama}</strong>
                 </div>
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500">Acara:</span>
-                  <span className="text-slate-800 font-medium truncate max-w-[200px]">{eventTitle}</span>
+                <div className="flex items-center justify-between border-b border-stone-200/60 pb-2">
+                  <span className="text-stone-500 font-light">Acara:</span>
+                  <span className="text-stone-800 font-medium truncate max-w-[200px]">{eventTitle}</span>
                 </div>
-                <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                  <span className="text-slate-500">Paket:</span>
-                  <span className="text-slate-800 font-medium">{registeredResult.kategori}</span>
+                <div className="flex items-center justify-between border-b border-stone-200/60 pb-2">
+                  <span className="text-stone-500 font-light">Paket:</span>
+                  <span className="text-stone-800 font-medium">{registeredResult.kategori}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Status Pembayaran:</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                  <span className="text-stone-500 font-light">Status Pembayaran:</span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-medium ${
                     registeredResult.statusBayar === 'VERIFIED'
-                      ? 'bg-emerald-100 text-emerald-800'
-                      : 'bg-amber-100 text-amber-900'
+                      ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                      : 'bg-amber-100 text-amber-900 border border-amber-200'
                   }`}>
                     {registeredResult.statusBayar === 'VERIFIED' ? 'Terverifikasi (Lunas)' : 'Menunggu Verifikasi Admin'}
                   </span>
                 </div>
               </div>
 
-              {/* Notice Langkah Selanjutnya: Jika Menunggu Verifikasi */}
+              {/* Notice Langkah Selanjutnya */}
               {registeredResult.statusBayar !== 'VERIFIED' ? (
-                <div className="p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200 text-left space-y-1.5 text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-900">
-                    <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                <div className="p-4 rounded-2xl bg-[#FAF9F6] border border-stone-200/90 text-left space-y-1.5 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-stone-900">
+                    <Clock className="w-4 h-4 text-stone-600 shrink-0" />
                     <span>Langkah Selanjutnya: Menunggu Verifikasi Panitia</span>
                   </div>
-                  <p className="text-slate-600 text-[11.5px] leading-relaxed">
+                  <p className="text-stone-600 text-[11.5px] font-light leading-relaxed">
                     Bukti transfer Anda telah tersimpan di sistem. Panitia akan memvalidasi pembayaran Anda.
                     <br />
-                    Setelah diverifikasi, <strong>Tautan WhatsApp Group Resmi Peserta</strong> & <strong>E-Ticket</strong> akan dikirimkan otomatis ke alamat email Anda: <strong className="text-slate-800">{registeredResult.email}</strong>.
+                    Setelah diverifikasi, <strong>Tautan WhatsApp Group Resmi</strong> & <strong>E-Ticket</strong> akan dikirimkan otomatis ke alamat email: <strong className="text-stone-900 font-mono">{registeredResult.email}</strong>.
                   </p>
                 </div>
               ) : (
-                <div className="p-3.5 rounded-2xl bg-emerald-50/90 border border-emerald-200 text-left space-y-1 text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-emerald-900">
+                <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200/90 text-left space-y-1 text-xs">
+                  <div className="flex items-center gap-1.5 font-semibold text-emerald-950">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>Pembayaran Terverifikasi Lunas!</span>
                   </div>
-                  <p className="text-slate-600 text-[11.5px]">
+                  <p className="text-emerald-900/80 text-[11.5px] font-light">
                     Silakan langsung bergabung ke WhatsApp Group resmi peserta untuk mengakses link Zoom & materi pelatihan.
                   </p>
                 </div>
               )}
 
-              <div className="pt-2 space-y-2">
+              <div className="pt-2 space-y-2.5">
                 {/* HANYA tampilkan Tautan Grup WhatsApp jika sudah VERIFIED/LUNAS */}
                 {registeredResult.statusBayar === 'VERIFIED' && webConfig.wa_group_url && (
                   <a
                     href={webConfig.wa_group_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3.5 rounded-2xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all inline-flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full py-3.5 rounded-xl text-xs font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all inline-flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
                   >
-                    <Users className="w-4 h-4" />
+                    <Users className="w-4 h-4 text-[#D4AF37]" />
                     <span>Gabung WhatsApp Group Resmi Peserta</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
                   </a>
                 )}
 
@@ -1170,20 +1270,20 @@ export default function PublicRegistrationWizard({ activeEvent = null }) {
                     )}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-full py-3.5 rounded-2xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white transition-all inline-flex items-center justify-center gap-2 shadow-sm"
+                    className="w-full py-3.5 rounded-xl text-xs font-medium bg-[#0A192F] hover:bg-[#112240] text-white transition-all inline-flex items-center justify-center gap-2 shadow-sm active:scale-[0.98]"
                   >
-                    <MessageCircle className="w-4 h-4" />
+                    <MessageCircle className="w-4 h-4 text-[#D4AF37]" />
                     <span>Konfirmasi Pembayaran ke WA Admin</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-4 h-4 text-[#D4AF37]" />
                   </a>
                 )}
 
                 <button
                   type="button"
                   onClick={() => window.print()}
-                  className="w-full py-2.5 rounded-xl text-xs font-semibold border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition-all inline-flex items-center justify-center gap-2 shadow-2xs"
+                  className="w-full py-2.5 rounded-xl text-xs font-medium border border-stone-200/90 bg-white hover:bg-stone-50 text-stone-700 transition-all inline-flex items-center justify-center gap-2 shadow-2xs active:scale-[0.98] cursor-pointer"
                 >
-                  <Printer className="w-3.5 h-3.5 text-slate-500" />
+                  <Printer className="w-3.5 h-3.5 text-stone-400" />
                   <span>Cetak / Simpan Tanda Terima (PDF)</span>
                 </button>
               </div>
