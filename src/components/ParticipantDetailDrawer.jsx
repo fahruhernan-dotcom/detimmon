@@ -118,7 +118,8 @@ export default function ParticipantDetailDrawer({
   // Group & Community Detection
   const isMabar11 = participant.packageType === 'MABAR_11' || participant.packageType === 'GROUP_11' || (participant.kategori || '').includes('11') || (participant.nominal === 1000000);
   const isMabar6 = participant.packageType === 'MABAR_6' || participant.packageType === 'GROUP' || (participant.kategori || '').toLowerCase().includes('mabar') || (participant.nominal === 500000);
-  const isGroup = isMabar11 || isMabar6 || (Array.isArray(participant.registration_members) && participant.registration_members.length > 0);
+  const isMabar = isMabar11 || isMabar6;
+  const isGroup = isMabar || (Array.isArray(participant.registration_members) && participant.registration_members.length > 0);
   const totalPax = isMabar11 ? 11 : isMabar6 ? 6 : (participant.registration_members?.length || 1);
 
   const regMembers = Array.isArray(participant.registration_members) ? participant.registration_members : [];

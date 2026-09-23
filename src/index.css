@@ -114,6 +114,37 @@
   overflow: hidden;
 }
 
+/* Smooth Cascading Table Row Motion for Dropdown Expansions */
+@keyframes tableRowSlideDown {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes tableRowSlideUp {
+  0% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+
+.animate-row-slide-down {
+  animation: tableRowSlideDown 240ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-row-slide-up {
+  animation: tableRowSlideUp 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* Breathing Micro-interaction for Status Indicators */
 @keyframes breathing {
   0%, 100% {

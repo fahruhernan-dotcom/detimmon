@@ -28,7 +28,6 @@ import { paymentService } from '../../services/paymentService';
 import { emailService } from '../../services/emailService';
 import { sendEmailViaGmail, buildTicketEmailHtml, uploadBackupToDrive } from '../../services/googleApiService';
 
-import GroupRosterAccordion from './components/GroupRosterAccordion';
 import AddModal from '../../components/AddModal';
 import EditRegistrantModal from '../../components/EditRegistrantModal';
 import FastVerifyModal from '../payments/FastVerifyModal';
@@ -57,11 +56,12 @@ export default function RegistrantsView({
 }) {
   const confirm = useConfirm();
 
-  // Internal Filter & Search State
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState(initialFilter);
   const [packageFilter, setPackageFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('grouped'); // 'grouped' | 'flat'
   const [expandedRows, setExpandedRows] = useState({});
+  const [collapsingRows, setCollapsingRows] = useState({});
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modals & Active Selections
@@ -79,10 +79,30 @@ export default function RegistrantsView({
   }, [onShowToast]);
 
   const toggleExpandRow = (id) => {
-    setExpandedRows(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
+    if (collapsingRows[id]) return; // prevent interruption during animation
+
+    if (expandedRows[id]) {
+      // Smooth collapse animation
+      setCollapsingRows(prev => ({ ...prev, [id]: true }));
+      setTimeout(() => {
+        setExpandedRows(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+        setCollapsingRows(prev => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }, 220);
+    } else {
+      // Smooth expand animation
+      setExpandedRows(prev => ({
+        ...prev,
+        [id]: true
+      }));
+    }
   };
 
   const activeRegistrants = useMemo(() => registrants.filter(r => !r.isDeleted), [registrants]);
@@ -145,10 +165,101 @@ export default function RegistrantsView({
     });
   }, [registrants, statusFilter, packageFilter, search]);
 
-  // Counts
+  // Counts & Participant Totals
   const pendingCount = useMemo(() => activeRegistrants.filter(r => r.statusBayar === 'PENDING').length, [activeRegistrants]);
   const lunasCount = useMemo(() => activeRegistrants.filter(r => r.statusBayar === 'LUNAS').length, [activeRegistrants]);
   const trashCount = useMemo(() => deletedRegistrants.length, [deletedRegistrants]);
+
+  const totalPesertaCount = useMemo(() => {
+    return activeRegistrants.reduce((acc, r) => {
+      const isMabar11 = r.packageType === 'MABAR_11' || r.packageType === 'GROUP_11' || r.kategori?.includes('11') || r.nominal === 1000000;
+      const isMabar6 = r.packageType === 'MABAR_6' || r.packageType === 'GROUP' || r.kategori?.includes('6') || r.nominal === 500000;
+      if (isMabar11 || isMabar6) {
+        const filled = (r.registration_members || []).filter(
+          m => m.ticket_suffix !== 'A' && m.persons?.full_name && m.persons.full_name.trim().length > 0
+        );
+        return acc + 1 + filled.length;
+      }
+      return acc + 1;
+    }, 0);
+  }, [activeRegistrants]);
+
+  // Flattened participants list for 'flat' view mode
+  const flatParticipantsData = useMemo(() => {
+    const list = [];
+    filteredData.forEach(item => {
+      const isMabar11 = item.packageType === 'MABAR_11' || item.packageType === 'GROUP_11' || item.kategori?.includes('11') || item.nominal === 1000000;
+      const isMabar6 = item.packageType === 'MABAR_6' || item.packageType === 'GROUP' || item.kategori?.includes('6') || item.nominal === 500000;
+      const isGroup = isMabar11 || isMabar6;
+      const totalPax = isMabar11 ? 11 : isMabar6 ? 6 : 1;
+
+      // 1. Leader / Single Participant
+      list.push({
+        ...item,
+        uniqueRowKey: `${item.id}-leader`,
+        isMemberSlot: false,
+        slotSuffix: isGroup ? 'A' : null,
+        displayName: item.nama,
+        displayEmail: item.email,
+        displayInstansi: item.instansi || '-',
+        displayDomisili: item.domisili || item.kota || 'Surakarta',
+        displayPaket: isMabar11 ? 'Komunitas (11 Pax) • Ketua' : isMabar6 ? 'MABAR (6 Pax) • Ketua' : 'Individu',
+        displayNominal: item.nominal,
+        displayTicket: isGroup ? `${item.nomorTicket || 'TICKET'}-A` : item.nomorTicket,
+        displayIsBonus: false,
+        displayIsFilled: true,
+        displayEmailSent: item.statusEmailTicket === 'TERKIRIM',
+        parentItem: item
+      });
+
+      // 2. Additional Group Members
+      if (isGroup) {
+        const additionalMembers = item.registration_members || [];
+        for (let idx = 1; idx < totalPax; idx++) {
+          const suffix = String.fromCharCode(65 + idx);
+          const isBonus = idx === totalPax - 1 && isMabar11;
+          const subTicket = `${item.nomorTicket || 'TICKET'}-${suffix}`;
+          const m = additionalMembers.find(member => member.ticket_suffix === suffix);
+          const isFilled = Boolean(m?.persons?.full_name && m.persons.full_name.trim().length > 0);
+          const memberName = isFilled ? m.persons.full_name : '(Data Belum Diisi • Menunggu Anggota)';
+          const memberEmail = isFilled ? (m.persons.email || '-') : '-';
+          const memberPhone = isFilled ? (m.persons.whatsapp || '') : '';
+          const memberInstansi = isFilled ? (m.persons.institution || m.persons?.instansi || item.instansi || '-') : (item.instansi || '-');
+          const memberDomisili = isFilled ? (m.persons.city || m.persons?.domisili || item.domisili || item.kota || 'Surakarta') : (item.domisili || item.kota || 'Surakarta');
+          const isEmailSent = Boolean(m?.ticket_sent_at) || 
+            (Array.isArray(item.email_logs) && item.email_logs.some(l => l.recipient_email === m?.persons?.email && l.status === 'SENT'));
+
+          list.push({
+            ...item,
+            id: m?.id || `${item.id}-${suffix}`,
+            uniqueRowKey: `${item.id}-member-${suffix}`,
+            nama: memberName,
+            email: memberEmail,
+            whatsapp: memberPhone,
+            instansi: memberInstansi,
+            domisili: memberDomisili,
+            kota: memberDomisili,
+            nomorTicket: subTicket,
+            isMemberSlot: true,
+            parentLeaderName: item.nama,
+            slotSuffix: suffix,
+            displayName: memberName,
+            displayEmail: memberEmail,
+            displayInstansi: memberInstansi,
+            displayDomisili: memberDomisili,
+            displayPaket: isBonus ? 'Bonus Gratis (10+1)' : `Anggota Slot [${suffix}]`,
+            displayNominal: null,
+            displayTicket: subTicket,
+            displayIsBonus: isBonus,
+            displayIsFilled: isFilled,
+            displayEmailSent: isEmailSent,
+            parentItem: item
+          });
+        }
+      }
+    });
+    return list;
+  }, [filteredData]);
 
   // ── Actions & Handlers ─────────────────────────────────────
   const handleRefresh = async () => {
@@ -515,16 +626,16 @@ export default function RegistrantsView({
     <div className="space-y-5 animate-fade-in">
       
       {/* ── TOP CONTROL & FILTER BAR ────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
         
         {/* Search Input */}
-        <div className="relative flex-1 max-w-md">
+        <div className="relative w-full sm:w-72 md:w-80">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Cari nama ketua, anggota, email, nomor tiket (TICKET-880-B)..."
+            placeholder="Cari nama, email, nomor tiket..."
             className="w-full pl-9.5 pr-4 py-2 text-xs rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400"
           />
         </div>
@@ -542,7 +653,7 @@ export default function RegistrantsView({
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              Semua ({activeRegistrants.length})
+              Semua ({activeRegistrants.length} Order • {totalPesertaCount} Peserta)
             </button>
             <button
               type="button"
@@ -578,6 +689,35 @@ export default function RegistrantsView({
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>Sampah ({trashCount})</span>
+            </button>
+          </div>
+
+          {/* View Mode Switcher: Per Order vs Semua Peserta */}
+          <div className="flex items-center p-1 bg-slate-100 rounded-xl text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setViewMode('grouped')}
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === 'grouped'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+              title="Tampilan daftar per transaksi order pendaftaran"
+            >
+              Per Order ({filteredData.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('flat')}
+              className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                viewMode === 'flat'
+                  ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-indigo-700'
+              }`}
+              title="Tampilkan seluruh peserta termasuk anggota rombongan dalam baris mandiri"
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Semua Peserta ({totalPesertaCount})</span>
             </button>
           </div>
 
@@ -630,7 +770,7 @@ export default function RegistrantsView({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredData.length === 0 ? (
+              {((viewMode === 'flat' ? flatParticipantsData : filteredData).length === 0) ? (
                 <tr>
                   <td colSpan={7} className="text-center py-12 text-slate-400">
                     <div className="flex flex-col items-center gap-2">
@@ -642,9 +782,132 @@ export default function RegistrantsView({
                     </div>
                   </td>
                 </tr>
+              ) : viewMode === 'flat' ? (
+                /* ── FLAT VIEW: ALL PARTICIPANTS AS UNIFIED TABLE ROWS ── */
+                flatParticipantsData.map((p) => {
+                  const isLunas = p.statusBayar === 'LUNAS';
+                  const isPending = p.statusBayar === 'PENDING';
+                  const isMember = p.isMemberSlot;
+                  const parentItem = p.parentItem || p;
+
+                  return (
+                    <tr
+                      key={p.uniqueRowKey || p.id}
+                      onClick={() => setActiveDrawerParticipant(p)}
+                      className={`hover:bg-amber-500/5 transition-colors cursor-pointer group ${isMember ? 'bg-slate-50/40' : ''}`}
+                    >
+                      {/* Name & Email */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-1.5">
+                          {isMember && (
+                            <>
+                              <span className="text-slate-400 font-mono text-[11px] select-none">↳</span>
+                              <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-mono text-[10px] font-bold inline-flex items-center justify-center shrink-0">
+                                {p.slotSuffix}
+                              </span>
+                            </>
+                          )}
+                          <span className={`font-semibold transition-colors ${
+                            isMember && !p.displayIsFilled 
+                              ? 'text-slate-400 italic' 
+                              : 'text-slate-950 group-hover:text-amber-800'
+                          }`}>
+                            {p.displayName}
+                          </span>
+                          {!isMember && (p.packageType?.startsWith('MABAR') || p.packageType?.startsWith('GROUP')) && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                              KETUA
+                            </span>
+                          )}
+                          {p.displayIsBonus && (
+                            <span className="text-[9.5px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                              BONUS
+                            </span>
+                          )}
+                        </div>
+                        <div className={`text-[11px] text-slate-400 truncate max-w-[220px] ${isMember ? 'pl-8' : ''}`}>
+                          {p.displayEmail}
+                        </div>
+                      </td>
+
+                      {/* Instansi & Domisili */}
+                      <td className="py-3.5 px-4 hidden md:table-cell">
+                        <div className="text-slate-800 font-medium truncate max-w-[180px]">
+                          {p.displayInstansi || '-'}
+                        </div>
+                        <div className="text-[11px] text-slate-400">
+                          {p.displayDomisili || 'Surakarta'}
+                        </div>
+                      </td>
+
+                      {/* Paket / Nominal */}
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono font-bold text-slate-900">
+                          {p.displayNominal ? formatRupiah(p.displayNominal) : '-'}
+                        </div>
+                        <div className="text-[10.5px] text-slate-500 mt-0.5">
+                          {p.displayPaket}
+                        </div>
+                      </td>
+
+                      {/* Status Bayar */}
+                      <td className="py-3.5 px-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono border ${
+                          isLunas 
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                            : isPending
+                            ? 'bg-amber-50 text-amber-900 border-amber-200'
+                            : 'bg-rose-50 text-rose-800 border-rose-200'
+                        }`}>
+                          {p.statusBayar}
+                        </span>
+                      </td>
+
+                      {/* Bukti Transfer */}
+                      <td className="py-3.5 px-4">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setFastVerifyParticipantId(parentItem.id);
+                            setIsFastVerifyOpen(true);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold border transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer ${
+                            isPending && !isMember
+                              ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-950 font-bold shadow-2xs' 
+                              : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700 shadow-2xs'
+                          }`}
+                          title="Pratinjau bukti transfer & verifikasi"
+                        >
+                          <Eye className={`w-3.5 h-3.5 ${isPending && !isMember ? 'text-amber-700' : 'text-slate-500'}`} />
+                          <span>{isPending && !isMember ? 'Cek & Verif' : 'Lihat Bukti'}</span>
+                        </button>
+                      </td>
+
+                      {/* E-Ticket */}
+                      <td className="py-3.5 px-4 hidden sm:table-cell font-mono text-[11px]">
+                        <div className="text-slate-700">{p.displayTicket || '-'}</div>
+                        <div className={`text-[10px] ${p.displayEmailSent ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                          {p.displayEmailSent ? '✓ Terkirim' : 'Belum kirim'}
+                        </div>
+                      </td>
+
+                      {/* Action Column */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="inline-flex items-center gap-1 text-slate-400 group-hover:text-amber-700 transition-colors text-xs font-medium">
+                          <span className="hidden lg:inline">Detail</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               ) : (
+                /* ── GROUPED VIEW: PER ORDER WITH CLEAN DOWNWARDS TABLE ROWS ── */
                 filteredData.map((item) => {
                   const isExpanded = Boolean(expandedRows[item.id]);
+                  const isCollapsing = Boolean(collapsingRows[item.id]);
+                  const isActivelyOpen = isExpanded && !isCollapsing;
                   const isLunas = item.statusBayar === 'LUNAS';
                   const isPending = item.statusBayar === 'PENDING';
                   const isMabar11 = item.packageType === 'MABAR_11' || item.packageType === 'GROUP_11' || item.kategori?.includes('11') || item.kategori?.includes('Komunitas') || item.nominal === 1000000;
@@ -660,56 +923,26 @@ export default function RegistrantsView({
 
                   return (
                     <React.Fragment key={item.id}>
+                      {/* LEADER / PRIMARY ORDER ROW */}
                       <tr
                         onClick={() => setActiveDrawerParticipant(item)}
-                        className={`hover:bg-amber-500/5 transition-colors cursor-pointer group ${isExpanded ? 'bg-amber-500/[0.03]' : ''}`}
+                        className={`hover:bg-amber-500/5 transition-colors cursor-pointer group ${isActivelyOpen ? 'bg-amber-500/[0.03]' : ''}`}
                       >
                         {/* Name & Email */}
                         <td className="py-3.5 px-4">
-                          <div className="font-semibold text-slate-950 group-hover:text-amber-800 transition-colors">
-                            {item.nama}
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-slate-950 group-hover:text-amber-800 transition-colors">
+                              {item.nama}
+                            </span>
+                            {isGroup && (
+                              <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                                KETUA
+                              </span>
+                            )}
                           </div>
                           <div className="text-[11px] text-slate-400 truncate max-w-[220px]">
                             {item.email}
                           </div>
-
-                          {/* Group & Member Badges */}
-                          {isGroup && (
-                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                type="button"
-                                onClick={() => setActiveMabarRegistrant(item)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 transition-all cursor-pointer active:scale-95"
-                                title="Buka modal kelola anggota rombongan"
-                              >
-                                <Users className="w-3 h-3 text-indigo-600" />
-                                <span>{filledPaxCount}/{totalPax} Terisi</span>
-                              </button>
-
-                              {/* Member Pills Preview */}
-                              {filledAdditionalMembers.map((m) => (
-                                <span 
-                                  key={m.id || m.ticket_suffix}
-                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-50 text-amber-900 border border-amber-200/80 font-medium"
-                                  title={`Slot ${m.ticket_suffix}: ${m.persons?.full_name} (${m.persons?.email || '-'})`}
-                                >
-                                  <span className="font-bold text-amber-600">[{m.ticket_suffix}]</span>
-                                  <span className="truncate max-w-[100px]">{m.persons?.full_name}</span>
-                                </span>
-                              ))}
-
-                              {/* Quick toggle accordion */}
-                              <button
-                                type="button"
-                                onClick={() => toggleExpandRow(item.id)}
-                                className="inline-flex items-center gap-0.5 text-[10px] text-slate-500 hover:text-indigo-600 font-semibold px-1 py-0.5 rounded hover:bg-slate-100 transition-colors cursor-pointer"
-                                title={isExpanded ? "Tutup rincian roster" : "Buka rincian slot tiket"}
-                              >
-                                <span>{isExpanded ? 'Tutup Roster' : 'Lihat Slot'}</span>
-                                {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                              </button>
-                            </div>
-                          )}
                         </td>
 
                         {/* Instansi & Domisili */}
@@ -727,15 +960,29 @@ export default function RegistrantsView({
                           <div className="font-mono font-bold text-slate-900">
                             {formatRupiah(item.nominal || 0)}
                           </div>
-                          <div className="text-[10.5px] text-slate-500 flex items-center gap-1 flex-wrap mt-0.5">
-                            {isMabar11 ? (
-                              <span className="text-indigo-600 font-semibold flex items-center gap-0.5 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
-                                <Users className="w-3 h-3" /> Komunitas (11 Pax)
-                              </span>
-                            ) : isMabar6 ? (
-                              <span className="text-indigo-600 font-semibold flex items-center gap-0.5 bg-indigo-50/80 px-1.5 py-0.5 rounded border border-indigo-100">
-                                <Users className="w-3 h-3" /> MABAR (6 Pax)
-                              </span>
+                          <div className="text-[10.5px] text-slate-500 flex items-center gap-1.5 flex-wrap mt-0.5">
+                            {isGroup ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleExpandRow(item.id);
+                                }}
+                                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10.5px] font-semibold border transition-all duration-300 ease-out active:scale-95 cursor-pointer shadow-2xs ${
+                                  isActivelyOpen
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-indigo-100'
+                                    : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 hover:border-indigo-300'
+                                }`}
+                                title={isActivelyOpen ? "Tutup rincian anggota" : "Buka rincian anggota ke bawah"}
+                              >
+                                <Users className="w-3.5 h-3.5" />
+                                <span>{isMabar11 ? 'Komunitas (11 Pax)' : 'MABAR (6 Pax)'}</span>
+                                <ChevronDown 
+                                  className={`w-3.5 h-3.5 transition-transform duration-300 ease-out ${
+                                    isActivelyOpen ? 'rotate-180 text-white/90' : 'rotate-0 text-indigo-500'
+                                  }`} 
+                                />
+                              </button>
                             ) : (
                               <span>Individu</span>
                             )}
@@ -778,7 +1025,9 @@ export default function RegistrantsView({
 
                         {/* E-Ticket */}
                         <td className="py-3.5 px-4 hidden sm:table-cell font-mono text-[11px]">
-                          <div className="text-slate-700">{item.nomorTicket || '-'}</div>
+                          <div className="text-slate-700">
+                            {isGroup ? `${item.nomorTicket || 'TICKET'}-A` : (item.nomorTicket || '-')}
+                          </div>
                           <div className={`text-[10px] ${item.statusEmailTicket === 'TERKIRIM' ? 'text-emerald-600' : 'text-slate-400'}`}>
                             {item.statusEmailTicket === 'TERKIRIM' ? '✓ Terkirim' : 'Belum kirim'}
                           </div>
@@ -826,22 +1075,143 @@ export default function RegistrantsView({
                         </td>
                       </tr>
 
-                      {/* ── EXPANDABLE GROUP ROSTER ACCORDION ROW ── */}
+                      {/* ── EXPANDED MEMBER ROWS: UNIFIED STANDARD TABLE ROWS (SAME GOOD UI AS DR. BUDI) ── */}
                       {isGroup && isExpanded && (
-                        <tr className="bg-slate-50/70 border-b border-slate-200/80" onClick={(e) => e.stopPropagation()}>
-                          <td colSpan={7} className="p-4 pl-6 md:pl-10">
-                            <GroupRosterAccordion
-                              item={item}
-                              activeEvent={activeEvent}
-                              googleOAuthToken={googleOAuthToken}
-                              onResendMemberTicket={handleResendMemberTicket}
-                              onOpenTicketPreview={(p) => setActiveTicketPreview(p)}
-                              onOpenEmailPreview={(p) => setActiveEmailPreview(p)}
-                              onOpenMembersModal={(p) => setActiveMabarRegistrant(p)}
-                              onShowToast={toast}
-                            />
-                          </td>
-                        </tr>
+                        Array.from({ length: totalPax - 1 }).map((_, idx) => {
+                          const slotIndex = idx + 1;
+                          const suffix = String.fromCharCode(65 + slotIndex);
+                          const isBonus = slotIndex === totalPax - 1 && isMabar11;
+                          const subTicket = `${item.nomorTicket || 'TICKET'}-${suffix}`;
+                          const m = additionalMembers.find(member => member.ticket_suffix === suffix);
+                          const isFilled = Boolean(m?.persons?.full_name && m.persons.full_name.trim().length > 0);
+                          const memberName = isFilled ? m.persons.full_name : '(Data Belum Diisi • Menunggu Anggota)';
+                          const memberEmail = isFilled ? (m.persons.email || '-') : 'Belum mengisi form mandiri';
+                          const memberInstansi = isFilled ? (m.persons.institution || m.persons?.instansi || item.instansi || '-') : (item.instansi || '-');
+                          const memberDomisili = isFilled ? (m.persons.city || m.persons?.domisili || item.domisili || item.kota || 'Surakarta') : (item.domisili || item.kota || 'Surakarta');
+                          const isEmailSent = Boolean(m?.ticket_sent_at) || 
+                            (Array.isArray(item.email_logs) && item.email_logs.some(l => l.recipient_email === m?.persons?.email && l.status === 'SENT'));
+
+                          const memberDrawerData = {
+                            ...item,
+                            id: m?.id || `${item.id}-${suffix}`,
+                            nama: memberName,
+                            email: memberEmail,
+                            whatsapp: isFilled ? (m.persons.whatsapp || '') : '',
+                            instansi: memberInstansi,
+                            kota: memberDomisili,
+                            nomorTicket: subTicket,
+                            isMemberSlot: true,
+                            slotSuffix: suffix,
+                            statusEmailTicket: isEmailSent ? 'TERKIRIM' : 'BELUM',
+                            parentLeaderName: item.nama
+                          };
+
+                          return (
+                            <tr
+                              key={`${item.id}-member-${suffix}`}
+                              onClick={() => !isCollapsing && setActiveDrawerParticipant(memberDrawerData)}
+                              className={`bg-slate-50/50 transition-all duration-200 border-b ${
+                                isCollapsing 
+                                  ? 'border-transparent pointer-events-none opacity-0 -translate-y-2 animate-row-slide-up' 
+                                  : 'hover:bg-amber-500/5 cursor-pointer border-slate-100 animate-row-slide-down'
+                              }`}
+                              style={{ 
+                                animationDelay: isCollapsing 
+                                  ? `${(totalPax - 2 - idx) * 12}ms` 
+                                  : `${idx * 24}ms` 
+                              }}
+                            >
+                              {/* Name & Email */}
+                              <td className="py-3 px-4 pl-7">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-slate-400 font-mono text-[11px] select-none">↳</span>
+                                  <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 font-mono text-[10px] font-bold inline-flex items-center justify-center shrink-0">
+                                    {suffix}
+                                  </span>
+                                  <span className={`font-semibold transition-colors ${
+                                    isFilled ? 'text-slate-900 group-hover:text-amber-800' : 'text-slate-400 italic'
+                                  }`}>
+                                    {memberName}
+                                  </span>
+                                  {isBonus && (
+                                    <span className="text-[9px] font-bold text-amber-700 bg-amber-50 px-1 py-0.2 rounded border border-amber-200">
+                                      BONUS
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="pl-9 text-[11px] text-slate-400 truncate max-w-[220px]">
+                                  {memberEmail}
+                                </div>
+                              </td>
+
+                              {/* Instansi & Domisili */}
+                              <td className="py-3 px-4 hidden md:table-cell">
+                                <div className="text-slate-800 font-medium truncate max-w-[180px]">
+                                  {memberInstansi}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                  {memberDomisili}
+                                </div>
+                              </td>
+
+                              {/* Paket & Nominal */}
+                              <td className="py-3 px-4">
+                                <div className="font-mono text-slate-400 text-xs">
+                                  {isBonus ? 'Rp 0' : '-'}
+                                </div>
+                                <div className="text-[10.5px] text-slate-500">
+                                  {isBonus ? 'Bonus Gratis (Slot K)' : `Anggota (Slot ${suffix})`}
+                                </div>
+                              </td>
+
+                              {/* Status Bayar */}
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider font-mono border ${
+                                  isLunas 
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                                    : isPending
+                                    ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                                }`}>
+                                  {item.statusBayar}
+                                </span>
+                              </td>
+
+                              {/* Bukti Transfer */}
+                              <td className="py-3 px-4">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setFastVerifyParticipantId(item.id);
+                                    setIsFastVerifyOpen(true);
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[11px] font-semibold border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs transition-all hover:scale-[1.02] cursor-pointer"
+                                  title="Pratinjau bukti transfer order rombongan"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-slate-500" />
+                                  <span>Lihat Bukti</span>
+                                </button>
+                              </td>
+
+                              {/* E-Ticket */}
+                              <td className="py-3 px-4 hidden sm:table-cell font-mono text-[11px]">
+                                <div className="text-slate-700">{subTicket}</div>
+                                <div className={`text-[10px] ${isEmailSent ? 'text-emerald-600 font-medium' : 'text-slate-400'}`}>
+                                  {isEmailSent ? '✓ Terkirim' : 'Belum kirim'}
+                                </div>
+                              </td>
+
+                              {/* Action Column */}
+                              <td className="py-3 px-4 text-right">
+                                <div className="inline-flex items-center gap-1 text-slate-400 group-hover:text-amber-700 transition-colors text-xs font-medium">
+                                  <span className="hidden lg:inline">Detail</span>
+                                  <ChevronRight className="w-4 h-4" />
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })
                       )}
                     </React.Fragment>
                   );
