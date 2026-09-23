@@ -320,7 +320,7 @@ BEGIN
     ) VALUES (
       v_new_reg_id,
       v_net_amount,
-      'TRANSFER_BANK',
+      'BANK_TRANSFER',
       'PENDING',
       p_proof_data,
       now()

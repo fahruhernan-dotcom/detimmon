@@ -267,6 +267,8 @@ export const registrationService = {
     } = payload;
 
     // Panggil Stored Procedure atomic di Supabase
+    // Catatan arsitektur: p_proof_data sengaja dikirim null ke RPC agar tidak memicu error enum 'TRANSFER_BANK'
+    // Bukti pembayaran diinsert langsung ke public.payments dengan enum resmi 'BANK_TRANSFER'
     const { data, error } = await supabase.rpc('submit_web_registration', {
       p_event_id:         eventId,
       p_nama:             fullName,
@@ -278,7 +280,7 @@ export const registrationService = {
       p_gross_amount:     totalDue || 100000,
       p_net_amount:       totalDue || 100000,
       p_voucher_code:     voucherCode || null,
-      p_proof_data:       proofData || null,
+      p_proof_data:       null,
       p_notes:            notes || null,
       p_mabar_members:    mabarMembers || [],
       // Backward compatibility aliases
@@ -291,6 +293,23 @@ export const registrationService = {
     if (error) {
       console.error('RPC submit_web_registration error:', error);
       throw error;
+    }
+
+    // Simpan bukti transfer ke payments dengan enum valid 'BANK_TRANSFER' jika pendaftaran berhasil
+    if (proofData && data?.registration_id) {
+      try {
+        await supabase.from('payments').insert({
+          registration_id: data.registration_id,
+          amount: totalDue || 100000,
+          payment_method: 'BANK_TRANSFER',
+          bank_destination: bankDestination || 'Bank Mandiri',
+          status: 'PENDING',
+          proof_drive_file_id: proofData,
+          submitted_at: new Date().toISOString()
+        });
+      } catch (payErr) {
+        console.warn('Notice payment insert fallback:', payErr);
+      }
     }
 
     return data;
