@@ -65,7 +65,7 @@ export default function LeaderAuthModal({
               type="text"
               value={leaderAuthInput}
               onChange={(e) => setLeaderAuthInput(e.target.value)}
-              placeholder="Contoh: fahruhernansakti@gmail.com atau 0812..."
+              placeholder="Contoh: ketua.komunitas@gmail.com atau 081234567890"
               className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 text-xs font-mono text-stone-900 bg-white focus:outline-none focus:border-[#0A192F] focus:ring-1 focus:ring-[#0A192F]"
               autoFocus
             />

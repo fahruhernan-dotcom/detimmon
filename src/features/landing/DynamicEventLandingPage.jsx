@@ -665,24 +665,24 @@ export default function DynamicEventLandingPage({ initialSlug }) {
           
           <div>
             <div className="text-sm font-semibold text-stone-200 font-mono tracking-wider">
-              LPK INDONESIA DIGNITY
+              {currentEvent?.landing_page_config?.institution_name || 'LPK INDONESIA DIGNITY'}
             </div>
             <div className="text-xs text-stone-400 mt-1.5 max-w-md leading-relaxed font-light">
-              Lembaga Pelatihan Kerja Resmi Terakreditasi. Menyelenggarakan sertifikasi kompetensi komunikasi publik, kepemimpinan panggung, dan manajemen acara profesional.
+              {currentEvent?.landing_page_config?.institution_tagline || 'Lembaga Pelatihan Kerja Resmi Terakreditasi. Menyelenggarakan sertifikasi kompetensi komunikasi publik, kepemimpinan panggung, dan manajemen acara profesional.'}
             </div>
           </div>
 
           <div className="text-xs text-stone-400 flex flex-col items-center md:items-end gap-1 font-light">
-            <div>Hotline WhatsApp: <strong className="text-stone-200 font-medium">+62 896-8107-7483</strong></div>
-            <div>Email Layanan: <strong className="text-stone-200 font-medium">official@dignityindonesia.id</strong></div>
-            <div>Instagram: <a href="https://www.instagram.com/indonesiadignity/?hl=en" target="_blank" rel="noreferrer" className="text-stone-200 hover:text-[#D4AF37] font-medium transition-colors">@indonesiadignity</a></div>
+            <div>Hotline WhatsApp: <strong className="text-stone-200 font-medium">{currentEvent?.landing_page_config?.contact_phone || import.meta.env.VITE_ADMIN_WHATSAPP || '+62 896-8107-7483'}</strong></div>
+            <div>Email Layanan: <strong className="text-stone-200 font-medium">{currentEvent?.landing_page_config?.contact_email || 'official@dignityindonesia.id'}</strong></div>
+            <div>Instagram: <a href={currentEvent?.landing_page_config?.instagram_url || "https://www.instagram.com/indonesiadignity/?hl=en"} target="_blank" rel="noreferrer" className="text-stone-200 hover:text-[#D4AF37] font-medium transition-colors">@{currentEvent?.landing_page_config?.instagram_handle || 'indonesiadignity'}</a></div>
             <div className="pt-1">
               <a href="#/cek-tiket" className="text-stone-300 hover:text-[#D4AF37] font-medium underline underline-offset-2 transition-colors">
                 Portal Cek Status Tiket &amp; Pendaftaran ↗
               </a>
             </div>
             <div className="text-[11px] text-stone-500 mt-2 font-mono">
-              &copy; 2026 LPK Indonesia Dignity. All rights reserved.
+              &copy; {new Date().getFullYear()} {currentEvent?.landing_page_config?.institution_name || 'LPK Indonesia Dignity'}. All rights reserved.
             </div>
           </div>
 

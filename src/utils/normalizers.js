@@ -277,7 +277,7 @@ export function normalizeWhatsApp(rawPhone) {
 
 /**
  * Masks an email for privacy compliance (UU PDP)
- * Example: fahruhernansakti@gmail.com -> f***i@gmail.com
+ * Example: peserta.resmi@gmail.com -> p***i@gmail.com
  */
 export function maskEmail(email) {
   if (!email || typeof email !== 'string' || !email.includes('@')) return '-';
